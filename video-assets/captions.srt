@@ -1,0 +1,75 @@
+1
+00:00:00,000 --> 00:00:05,200
+When an organization manages dozens of strategic initiatives across Technology, Finance,
+
+2
+00:00:05,200 --> 00:00:10,000
+Operations, and Marketing, critical project data gets trapped in disconnected spreadsheets.
+
+3
+00:00:10,000 --> 00:00:15,400
+Without a single source of truth, overdue milestones, budget overruns, and technical risks
+
+4
+00:00:15,400 --> 00:00:20,000
+stay hidden until deadlines are missed—forcing leadership to react too late.
+
+5
+00:00:20,000 --> 00:00:26,500
+ProjectPulse AI centralizes your entire project portfolio into one live intelligence workspace.
+
+6
+00:00:26,500 --> 00:00:33,000
+Every KPI, health status, and departmental rollup updates automatically from underlying records.
+
+7
+00:00:33,000 --> 00:00:39,200
+Track planned versus actual milestone dates, score critical risks on a probability-by-impact matrix,
+
+8
+00:00:39,200 --> 00:00:45,000
+and pinpoint departmental budget variances down to the exact dollar.
+
+9
+00:00:45,000 --> 00:00:50,400
+When briefing leadership, the Gemini AI Executive Assistant synthesizes your live database
+
+10
+00:00:50,400 --> 00:00:55,000
+into an evidence-backed report citing exact project variances and risk scores for human review.
+
+11
+00:00:56,000 --> 00:01:02,000
+[LIVE DEMO] On the Executive Dashboard, metrics are calculated from 12 synthetic demo projects,
+
+12
+00:01:02,000 --> 00:01:08,000
+highlighting three Red initiatives that require immediate PMO management attention.
+
+13
+00:01:08,000 --> 00:01:14,500
+Opening PRJ-102: Core Banking Ledger Modernization reveals why it triggered a Red health alert.
+
+14
+00:01:14,500 --> 00:01:21,500
+Milestone MS-102-2 (Mainframe Dual-Write Cutover) is overdue at 65% completion,
+
+15
+00:01:21,500 --> 00:01:28,000
+and actual spend is $2.59M against a $2.40M budget—a +$190,000 budget overrun.
+
+16
+00:01:28,000 --> 00:01:35,000
+In the Risk Register, RSK-102-A carries a critical score of 20/25 (Probability 5 × Impact 4).
+
+17
+00:01:35,000 --> 00:01:42,000
+When we update mitigation progress to 85% and complete the overdue milestone,
+
+18
+00:01:42,000 --> 00:01:48,000
+the Executive Dashboard immediately recalculates overdue counts and portfolio progress.
+
+19
+00:01:48,000 --> 00:01:55,000
+Finally, the AI Executive Assistant generates a verified weekly report ready for CSV or PDF export.

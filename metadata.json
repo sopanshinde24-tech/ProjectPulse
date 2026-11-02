@@ -1,0 +1,6 @@
+{
+  "name": "ProjectPulse AI — PMO & Portfolio Intelligence",
+  "description": "Enterprise Project Management Office (PMO) and Portfolio Intelligence Dashboard with live KPI analytics, milestone tracking, quantitative risk register, budget variance monitoring, guided recruiter demo, and evidence-grounded Gemini executive reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
