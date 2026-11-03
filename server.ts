@@ -354,10 +354,13 @@ function loadStateFromSqlite(): PortfolioState {
   const projectRows = db.prepare('SELECT * FROM projects ORDER BY code ASC').all() as Record<string, unknown>[];
   const taskCountRow = db.prepare('SELECT COUNT(*) as cnt FROM tasks').get() as { cnt: number };
   const hasLegacyOwner = projectRows.some(
-    (r) => String(r.owner) === 'Marcus Vance' || String(r.owner) === 'Elena Rostova'
+    (r) =>
+      String(r.owner) === 'Marcus Vance' ||
+      String(r.owner) === 'Elena Rostova' ||
+      String(r.owner) === 'Aarav Mehta'
   );
 
-  // Auto-seed or upgrade when tasks table is empty so all 15 modules have rich PwC India records immediately
+  // Auto-seed or upgrade when tasks table is empty or profile upgraded to Sopan Shinde
   if (projectRows.length === 0 || hasLegacyOwner || taskCountRow.cnt === 0) {
     const seed = createInitialSeedState();
     saveStateToSqlite(seed);
@@ -1038,7 +1041,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);

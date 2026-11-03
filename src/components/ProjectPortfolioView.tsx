@@ -47,7 +47,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
   initialStatusFilter = 'All',
   initialHealthFilter = 'All',
   onlyMyProjects = false,
-  currentUserName = 'Aarav Mehta',
+  currentUserName = 'Sopan Shinde',
   guidedStepNumber,
   onInspectProject,
   onOpenProjectDetails,
@@ -160,7 +160,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
   const [formCode, setFormCode] = useState('');
   const [formName, setFormName] = useState('');
   const [formDept, setFormDept] = useState<Department>('Technology');
-  const [formOwner, setFormOwner] = useState('Aarav Mehta');
+  const [formOwner, setFormOwner] = useState('Sopan Shinde');
   const [formOwnerRole, setFormOwnerRole] = useState('Partner, Advisory (PwC India)');
   const [formStartDate, setFormStartDate] = useState('2026-06-01');
   const [formEndDate, setFormEndDate] = useState('2026-12-31');
@@ -178,7 +178,7 @@ export const ProjectPortfolioView: React.FC<ProjectPortfolioViewProps> = ({
     setFormCode(`PRJ-${state.projects.length + 101}`);
     setFormName('');
     setFormDept('Technology');
-    setFormOwner(currentUserName || 'Aarav Mehta');
+    setFormOwner(currentUserName || 'Sopan Shinde');
     setFormOwnerRole('Partner, Digital & Cloud Advisory (PwC India)');
     setFormStartDate('2026-06-01');
     setFormEndDate('2026-12-31');

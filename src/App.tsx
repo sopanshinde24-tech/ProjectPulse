@@ -72,7 +72,7 @@ import {
 } from './types/portfolio';
 import { calculateRiskScore, computeDashboardKPIs } from './utils/calculations';
 
-const LOCAL_STORAGE_KEY = 'projectpulse_pwc_india_state_v3';
+const LOCAL_STORAGE_KEY = 'projectpulse_pwc_india_state_v4';
 
 interface SidebarGroup {
   groupLabel: string;
@@ -116,7 +116,7 @@ export default function App() {
 
   // RBAC User Role & Active Persona State
   const [currentUserRole, setCurrentUserRole] = useState<UserAppRole>('Administrator');
-  const [currentUserName, setCurrentUserName] = useState<string>('Aarav Mehta');
+  const [currentUserName, setCurrentUserName] = useState<string>('Sopan Shinde');
 
   // Global Search & Notifications Popovers
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
@@ -1355,12 +1355,33 @@ export default function App() {
               }}
               className="bg-transparent font-semibold text-slate-900 focus:outline-none cursor-pointer"
             >
-              <option value="Administrator">Administrator (Aarav Mehta)</option>
+              <option value="Administrator">Administrator (Sopan Shinde)</option>
               <option value="Project Manager">Project Manager (Ananya Iyer)</option>
               <option value="Team Member">Team Member (Siddharth Verma)</option>
               <option value="Executive / Viewer">Executive / Viewer (Read-Only)</option>
             </select>
           </div>
+
+          {/* Active User Profile Pill (Sopan Shinde) */}
+          <button
+            type="button"
+            onClick={() => setActiveModule('settings')}
+            title="View & Edit Profile Settings"
+            className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <span className="w-6 h-6 rounded-full bg-[#0F172A] text-white font-mono text-[10px] font-bold flex items-center justify-center">
+              {currentUserName
+                .split(' ')
+                .map((n) => n[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()}
+            </span>
+            <div className="text-left leading-tight">
+              <div className="text-xs font-bold text-slate-900">{currentUserName}</div>
+              <div className="text-[10px] font-mono text-slate-500">{currentUserRole}</div>
+            </div>
+          </button>
 
           {/* Real Data-Driven Notification Centre */}
           <div className="relative">
