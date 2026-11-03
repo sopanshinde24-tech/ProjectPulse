@@ -16,6 +16,9 @@ import { SEED_ETL_RUNS } from '../utils/dataEngineering';
 
 export const DEFAULT_REFERENCE_DATE = '2026-11-02';
 
+export const SOPAN_SHINDE_AVATAR_URL =
+  '/assets/aistudio/WhatsApp_Image_2026-11-01_at_00.41.23_e76d0c25.jpeg';
+
 export const SEED_TEAM_MEMBERS: TeamMember[] = [
   {
     id: 'tm-1',
@@ -27,6 +30,7 @@ export const SEED_TEAM_MEMBERS: TeamMember[] = [
     location: 'Mumbai (BKC)',
     weeklyCapacityHours: 40,
     avatarInitials: 'SS',
+    avatarUrl: SOPAN_SHINDE_AVATAR_URL,
   },
   {
     id: 'tm-2',

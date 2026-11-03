@@ -45,6 +45,7 @@ import {
 } from './src/utils/calculations';
 import {
   computeDataQualityAudit,
+  computeOverdueAndPerformanceAnalysis,
   runDataIngestionPipeline,
   SEED_ETL_RUNS,
 } from './src/utils/dataEngineering';
@@ -868,6 +869,39 @@ async function startServer() {
     }
   });
 
+  // 3B2. GET /api/milestones — Relational milestone retrieval with joined project context & overdue check
+  app.get('/api/milestones', (req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      const projMap = new Map(state.projects.map((p) => [p.id, p]));
+      const { projectId, status } = req.query;
+      const milestones = state.milestones
+        .filter((m) => {
+          if (projectId && m.projectId !== projectId) return false;
+          if (status && status !== 'All' && m.status !== status) return false;
+          return true;
+        })
+        .map((m) => {
+          const p = projMap.get(m.projectId);
+          return {
+            ...m,
+            projectCode: p?.code || 'UNMAPPED',
+            projectName: p?.name || 'Unmapped Project',
+            isOverdue: isMilestoneOverdue(m, state.referenceDate),
+          };
+        });
+
+      res.json({
+        count: milestones.length,
+        referenceDate: state.referenceDate,
+        milestones,
+      });
+    } catch (error) {
+      console.error('Error in GET /api/milestones:', error);
+      res.status(500).json({ error: 'Failed to retrieve relational milestone records.' });
+    }
+  });
+
   // 3C. GET /api/analytics/kpis — Live calculated KPIs, Data Quality Audit & Relational FK Integrity
   app.get('/api/analytics/kpis', (_req, res) => {
     try {
@@ -883,6 +917,18 @@ async function startServer() {
     } catch (error) {
       console.error('Error in GET /api/analytics/kpis:', error);
       res.status(500).json({ error: 'Failed to compute analytics KPIs and data quality metrics.' });
+    }
+  });
+
+  // 3C2. GET /api/analytics/overdue — Overdue Task & Milestone Analysis + Measured Execution Telemetry
+  app.get('/api/analytics/overdue', (_req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      const overdueAnalysis = computeOverdueAndPerformanceAnalysis(state);
+      res.json(overdueAnalysis);
+    } catch (error) {
+      console.error('Error in GET /api/analytics/overdue:', error);
+      res.status(500).json({ error: 'Failed to compute overdue task and milestone analysis.' });
     }
   });
 

@@ -196,6 +196,7 @@ export interface TeamMember {
   location: string;
   weeklyCapacityHours: number;
   avatarInitials: string;
+  avatarUrl?: string;
 }
 
 export interface TeamMemberWorkload extends TeamMember {
@@ -311,7 +312,7 @@ export interface PortfolioState {
 }
 
 export type ETLSourceFormat = 'CSV' | 'JSON' | 'REST API';
-export type ETLEntityTarget = 'Projects' | 'Tasks' | 'Combined Batch';
+export type ETLEntityTarget = 'Projects' | 'Tasks' | 'Milestones' | 'Combined Batch';
 export type ETLImportMode = 'upsert' | 'skip_duplicates' | 'strict_reject_duplicates';
 
 export interface ETLValidationIssue {
@@ -333,7 +334,7 @@ export interface ETLValidationIssue {
 
 export interface ETLTransformationItem {
   entityCode: string;
-  entityType: 'Project' | 'Task';
+  entityType: 'Project' | 'Task' | 'Milestone';
   operation: 'INSERT' | 'UPSERT_MERGE' | 'REJECTED' | 'SKIPPED_DUPLICATE';
   fieldsNormalized: string[];
   computedMetricsSummary: string;

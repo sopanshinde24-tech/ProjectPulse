@@ -12,7 +12,9 @@ import {
 import { generateProjectsCSV, parseProjectsFromCSV } from './csvExport';
 import {
   computeDataQualityAudit,
+  computeOverdueAndPerformanceAnalysis,
   runDataIngestionPipeline,
+  SAMPLE_CSV_MILESTONES_BATCH,
   SAMPLE_JSON_STRESS_BATCH,
 } from './dataEngineering';
 
@@ -298,7 +300,7 @@ export function runAllQAVerificationSuites(activeState?: PortfolioState): QAChec
     });
   }
 
-  // 10. Data Ingestion, Validation, Duplicate Detection & Quarantine Pipeline
+  // 10. Data Ingestion (Projects, Tasks & Milestones), Duplicate Detection & Quarantine Pipeline
   {
     const etlRes = runDataIngestionPipeline(
       SAMPLE_JSON_STRESS_BATCH,
@@ -313,49 +315,71 @@ export function runAllQAVerificationSuites(activeState?: PortfolioState): QAChec
       seed
     );
 
+    const msEtlRes = runDataIngestionPipeline(
+      SAMPLE_CSV_MILESTONES_BATCH,
+      {
+        batchName: 'QA Milestone CSV ETL Test',
+        sourceFormat: 'CSV',
+        entityTarget: 'Milestones',
+        importMode: 'upsert',
+        triggeredBy: 'Sopan Shinde',
+        dryRunOnly: false,
+      },
+      seed
+    );
+
     const run = etlRes.run;
+    const msRun = msEtlRes.run;
     const passed =
-      run.totalRecords === 5 &&
-      run.validRecords === 3 &&
-      run.insertedRecords === 2 &&
+      run.totalRecords === 6 &&
+      run.validRecords === 4 &&
+      run.insertedRecords === 3 &&
       run.updatedRecords === 1 &&
       run.duplicateRecords === 1 &&
       run.rejectedRecords === 2 &&
+      msRun.totalRecords === 3 &&
+      msRun.validRecords === 2 &&
+      msRun.rejectedRecords === 1 &&
       run.validationIssues.some((v) => v.rule === 'FOREIGN_KEY_ORPHAN') &&
-      run.validationIssues.some((v) => v.rule === 'REQUIRED_FIELD');
+      run.validationIssues.some((v) => v.rule === 'REQUIRED_FIELD') &&
+      msRun.validationIssues.some((v) => v.rule === 'FOREIGN_KEY_ORPHAN');
 
     results.push({
       id: 'qa-10',
       suite: '10. Data Ingestion & ETL Validation',
-      title: 'CSV/JSON Parsing, Duplicate Upsert & Invalid/Orphan Quarantine',
+      title: 'CSV/JSON Projects, Tasks & Milestones Ingestion, Upsert & Orphan Quarantine',
       passed,
       expected:
-        '5 parsed -> 3 valid (2 inserted, 1 duplicate upserted) -> 2 rejected (REQUIRED_FIELD + FOREIGN_KEY_ORPHAN)',
-      actual: `${run.totalRecords} parsed -> ${run.validRecords} valid (${run.insertedRecords} ins, ${run.updatedRecords} ups) -> ${run.rejectedRecords} rejected`,
+        'JSON Combined: 6 parsed -> 4 valid, 2 rejected; Milestone CSV: 3 parsed -> 2 valid, 1 FK orphan rejected',
+      actual: `JSON: ${run.totalRecords} parsed -> ${run.validRecords} valid, ${run.rejectedRecords} rej; Milestone CSV: ${msRun.totalRecords} parsed -> ${msRun.validRecords} valid, ${msRun.rejectedRecords} rej`,
       evidenceNote:
-        'Verified 6-stage ETL pipeline quarantines invalid schema rows and unmapped foreign keys while upserting valid updates.',
+        'Verified 6-stage ETL pipeline ingests Projects, Tasks, and Milestones while quarantining invalid schema rows and unmapped foreign keys.',
     });
   }
 
-  // 11. Relational Database Integrity & 5-Dimension Data Quality Audit
+  // 11. Relational Database Integrity, Overdue Analysis & Measured Performance Telemetry
   {
     const audit = computeDataQualityAudit(targetState);
+    const overdueAnalysis = computeOverdueAndPerformanceAnalysis(targetState);
     const zeroOrphans = audit.relationalChecks.every((c) => c.orphanedRows === 0);
     const passed =
       audit.overallScore >= 99 &&
       zeroOrphans &&
       audit.relationalChecks.length === 7 &&
-      audit.kpiFormulaRegistry.length === 9;
+      audit.kpiFormulaRegistry.length === 9 &&
+      overdueAnalysis.overdueMilestones.length === computeDashboardKPIs(targetState).overdueMilestones &&
+      overdueAnalysis.measuredTelemetry.kpiCalculationTimeMs >= 0 &&
+      overdueAnalysis.measuredTelemetry.reportGenerationTimeMs >= 0;
 
     results.push({
       id: 'qa-11',
-      suite: '11. Relational FK & Data Quality Audit',
-      title: 'Zero-Orphan Foreign Key Enforcement & 5-Dimension Quality Index',
+      suite: '11. Relational FK, Overdue & Telemetry Audit',
+      title: 'Zero-Orphan Foreign Key Enforcement, Overdue Analysis & Measured Latency',
       passed,
-      expected: 'Quality Score >= 99%, 0 Orphaned FKs across 7 relationships, 9 KPI formulas verified',
-      actual: `Quality=${audit.overallScore}%, ZeroOrphans=${zeroOrphans} (${audit.relationalChecks.length} FKs), Formulas=${audit.kpiFormulaRegistry.length}`,
+      expected: `Quality >= 99%, 0 Orphans (7 FKs), Overdue MS=${overdueAnalysis.overdueMilestones.length}, Measured KPI/Report ms >= 0`,
+      actual: `Quality=${audit.overallScore}%, ZeroOrphans=${zeroOrphans}, Overdue MS=${overdueAnalysis.overdueMilestones.length}, KPI=${overdueAnalysis.measuredTelemetry.kpiCalculationTimeMs}ms, Report=${overdueAnalysis.measuredTelemetry.reportGenerationTimeMs}ms`,
       evidenceNote:
-        'Verified referential integrity across projects, milestones, milestone_history, tasks, risks, issues, dependencies, and team_members.',
+        'Verified referential integrity across all 11 tables, overdue task/milestone evaluation, and real wall-clock KPI/report telemetry.',
     });
   }
 

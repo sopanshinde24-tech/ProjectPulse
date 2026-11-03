@@ -9,6 +9,8 @@ import {
   ETLSourceFormat,
   ETLTransformationItem,
   ETLValidationIssue,
+  Milestone,
+  MilestoneStatus,
   PortfolioState,
   Project,
   ProjectPriority,
@@ -17,7 +19,14 @@ import {
   TaskItem,
   TaskStatus,
 } from '../types/portfolio';
-import { calculateBudgetMetrics, computeDashboardKPIs, formatCurrency } from './calculations';
+import {
+  buildEvidenceReportFromState,
+  calculateBudgetMetrics,
+  computeDashboardKPIs,
+  formatCurrency,
+  isMilestoneOverdue,
+  isTaskOverdue,
+} from './calculations';
 
 export const SAMPLE_CSV_CLEAN_BATCH = `code,name,department,owner,ownerRole,startDate,endDate,allocatedBudget,actualSpend,status,priority,progress,strategicObjective
 PRJ-113,"RBI Digital Rupee (e-Rupee) Wholesale Settlement Gateway",Finance,"Sopan Shinde","Partner, Cyber & Cloud Transformation (PwC Mumbai)",2026-06-15,2027-01-31,1450000,680000,Active,Critical,52,"Integrate programmable CBDC settlement rails with core treasury ledger."
@@ -27,6 +36,11 @@ export const SAMPLE_CSV_TASKS_BATCH = `code,title,projectCode,assigneeName,prior
 TSK-221,"CBDC HSM Key Ceremony & Quorum Verification",PRJ-101,"Sopan Shinde",Critical,In Progress,2026-10-15,2026-11-18,36,24,"Execute FIPS 140-3 Level 3 HSM key ceremony for wholesale settlement nodes."
 TSK-222,"Ind-AS 109 ECL Parallel Run Reconciliation",PRJ-102,"Priya Sharma",High,In Progress,2026-10-20,2026-11-22,40,28,"Reconcile parallel ledger batch balances across 4 regional banking zones."
 TSK-998,"Orphaned Legacy Audit Task (Invalid Project FK)",PRJ-404,"Siddharth Verma",Medium,Not Started,2026-10-25,2026-11-25,20,0,"Intentional test row referencing non-existent PRJ-404 to verify foreign key validation."`;
+
+export const SAMPLE_CSV_MILESTONES_BATCH = `code,title,projectCode,owner,plannedDate,actualDate,status,completionPercent,deliverableNotes
+MS-101-4,"CERT-In Zero-Trust Sovereign Enclave Sign-Off",PRJ-101,"Sopan Shinde",2026-11-28,,In Progress,88,"Hardware root-of-trust attestation across Mumbai DR and Bengaluru primary zones."
+MS-102-2,"Mainframe Dual-Write Cutover & RTGS Sync",PRJ-102,"Ananya Iyer",2026-10-15,,Delayed,72,"Incremental milestone telemetry sync from core banking programme office."
+MS-999-ERR,"Unlinked Regulatory Gate (Invalid Project FK)",PRJ-404-NONE,"Sopan Shinde",2026-11-30,,Upcoming,0,"Intentional test row to verify Foreign-Key rejection on milestones table."`;
 
 export const SAMPLE_JSON_STRESS_BATCH = JSON.stringify(
   {
@@ -108,6 +122,18 @@ export const SAMPLE_JSON_STRESS_BATCH = JSON.stringify(
         estimatedHours: 16,
         actualHours: 4,
         description: 'Row designed to trigger FOREIGN_KEY_ORPHAN rejection during ETL validation.',
+      },
+    ],
+    milestones: [
+      {
+        code: 'MS-101-4',
+        title: 'CERT-In Zero-Trust Sovereign Enclave Sign-Off',
+        projectCode: 'PRJ-101',
+        owner: 'Sopan Shinde',
+        plannedDate: '2026-11-28',
+        status: 'In Progress',
+        completionPercent: 90,
+        deliverableNotes: 'Updated attestation readiness to 90% via SAP/Jira connector.',
       },
     ],
   },
@@ -297,6 +323,7 @@ export function runDataIngestionPipeline(
 
   let rawProjects: Record<string, unknown>[] = [];
   let rawTasks: Record<string, unknown>[] = [];
+  let rawMilestones: Record<string, unknown>[] = [];
 
   try {
     if (options.sourceFormat === 'JSON' || options.sourceFormat === 'REST API') {
@@ -304,17 +331,25 @@ export function runDataIngestionPipeline(
       if (Array.isArray(parsed)) {
         if (options.entityTarget === 'Tasks') {
           rawTasks = parsed;
+        } else if (options.entityTarget === 'Milestones') {
+          rawMilestones = parsed;
         } else {
           rawProjects = parsed;
         }
       } else if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed.projects)) rawProjects = parsed.projects;
         if (Array.isArray(parsed.tasks)) rawTasks = parsed.tasks;
+        if (Array.isArray(parsed.milestones)) rawMilestones = parsed.milestones;
       }
     } else {
       // CSV parsing
       const rows = parseCSVLines(rawPayload);
       if (
+        options.entityTarget === 'Milestones' ||
+        (rows[0] && ('plannedDate' in rows[0] || 'completionPercent' in rows[0]))
+      ) {
+        rawMilestones = rows;
+      } else if (
         options.entityTarget === 'Tasks' ||
         (rows[0] && ('projectCode' in rows[0] || 'estimatedHours' in rows[0]))
       ) {
@@ -340,20 +375,28 @@ export function runDataIngestionPipeline(
 
   rawProjects.forEach((r) => previewRecords.push({ _entity: 'Project', ...r }));
   rawTasks.forEach((r) => previewRecords.push({ _entity: 'Task', ...r }));
+  rawMilestones.forEach((r) => previewRecords.push({ _entity: 'Milestone', ...r }));
 
-  const totalRecords = rawProjects.length + rawTasks.length;
+  const totalRecords = rawProjects.length + rawTasks.length + rawMilestones.length;
   logs.push(
-    `[${new Date().toISOString()}] [STAGE 1: INGEST] Extracted ${rawProjects.length} project record(s) and ${rawTasks.length} task record(s) (${totalRecords} total).`
+    `[${new Date().toISOString()}] [STAGE 1: INGEST] Extracted ${rawProjects.length} project(s), ${rawTasks.length} task(s), and ${rawMilestones.length} milestone(s) (${totalRecords} total).`
   );
 
   const nextProjects = [...currentState.projects];
   const nextTasks = [...(currentState.tasks || [])];
+  const nextMilestones = [...currentState.milestones];
   const teamMembers = currentState.teamMembers || [];
 
   const validDepts: Department[] = ['Technology', 'Finance', 'Operations', 'Marketing'];
   const validProjectStatuses: ProjectStatus[] = ['Active', 'Completed', 'Delayed', 'At Risk'];
   const validPriorities: ProjectPriority[] = ['Critical', 'High', 'Medium', 'Low'];
   const validTaskStatuses: TaskStatus[] = ['Not Started', 'In Progress', 'Blocked', 'Completed'];
+  const validMilestoneStatuses: MilestoneStatus[] = [
+    'Completed',
+    'In Progress',
+    'Upcoming',
+    'Overdue',
+  ];
 
   let validRecords = 0;
   let insertedRecords = 0;
@@ -363,6 +406,7 @@ export function runDataIngestionPipeline(
 
   const seenProjectCodesInBatch = new Set<string>();
   const seenTaskCodesInBatch = new Set<string>();
+  const seenMilestoneCodesInBatch = new Set<string>();
 
   // STAGE 2 & 3: Validate & Transform Projects
   rawProjects.forEach((raw, idx) => {
@@ -743,6 +787,173 @@ export function runDataIngestionPipeline(
     }
   });
 
+  // STAGE 2 & 3: Validate & Transform Milestones
+  rawMilestones.forEach((raw, idx) => {
+    const rowNum = rawProjects.length + rawTasks.length + idx + 1;
+    const code = String(raw.code || '').trim().toUpperCase();
+    const title = String(raw.title || '').trim();
+    const projectCodeRef = String(raw.projectCode || raw.projectId || '').trim().toUpperCase();
+
+    // 1. Required fields check
+    if (!code || !title || !projectCodeRef) {
+      rejectedRecords++;
+      validationIssues.push({
+        id: `val-ms-req-${rowNum}-${Date.now()}`,
+        rowNumber: rowNum,
+        entityType: 'Milestone',
+        entityCode: code || `MS-ROW-${rowNum}`,
+        field: !code ? 'code' : !title ? 'title' : 'projectCode',
+        rule: 'REQUIRED_FIELD',
+        severity: 'Rejected',
+        message: 'Milestone record is missing required `code`, `title`, or `projectCode`.',
+        rawPayload: JSON.stringify(raw),
+      });
+      transformationSummary.push({
+        entityCode: code || `MS-ROW-${rowNum}`,
+        entityType: 'Milestone',
+        operation: 'REJECTED',
+        fieldsNormalized: [],
+        computedMetricsSummary: 'Rejected due to missing required milestone identifier.',
+      });
+      return;
+    }
+
+    // 2. Foreign Key Referential Integrity Check (`milestone.projectId -> projects.id`)
+    const linkedProject =
+      projectByCode.get(projectCodeRef) || projectById.get(String(raw.projectId || ''));
+    if (!linkedProject) {
+      rejectedRecords++;
+      validationIssues.push({
+        id: `val-ms-fk-${rowNum}-${Date.now()}`,
+        rowNumber: rowNum,
+        entityType: 'Milestone',
+        entityCode: code,
+        field: 'projectCode',
+        rule: 'FOREIGN_KEY_ORPHAN',
+        severity: 'Rejected',
+        message: `Foreign Key Violation: Referenced project "${projectCodeRef}" does not exist in \`projects\` table. Orphaned milestone rejected.`,
+        rawPayload: JSON.stringify(raw),
+      });
+      transformationSummary.push({
+        entityCode: code,
+        entityType: 'Milestone',
+        operation: 'REJECTED',
+        fieldsNormalized: [],
+        computedMetricsSummary: `Rejected orphan milestone (missing parent project ${projectCodeRef}).`,
+      });
+      return;
+    }
+
+    // 3. Duplicate Detection
+    const existingMsIdx = nextMilestones.findIndex((m) => m.code.toUpperCase() === code);
+    const isDuplicate = existingMsIdx >= 0 || seenMilestoneCodesInBatch.has(code);
+    seenMilestoneCodesInBatch.add(code);
+
+    if (isDuplicate) {
+      duplicateRecords++;
+      if (options.importMode === 'strict_reject_duplicates') {
+        rejectedRecords++;
+        validationIssues.push({
+          id: `val-ms-dup-${rowNum}-${Date.now()}`,
+          rowNumber: rowNum,
+          entityType: 'Milestone',
+          entityCode: code,
+          field: 'code',
+          rule: 'DUPLICATE_KEY',
+          severity: 'Rejected',
+          message: `Duplicate milestone code "${code}" rejected under strict_reject_duplicates mode.`,
+          rawPayload: JSON.stringify(raw),
+        });
+        return;
+      } else if (options.importMode === 'skip_duplicates') {
+        validationIssues.push({
+          id: `val-ms-skip-${rowNum}-${Date.now()}`,
+          rowNumber: rowNum,
+          entityType: 'Milestone',
+          entityCode: code,
+          field: 'code',
+          rule: 'DUPLICATE_KEY',
+          severity: 'Duplicate (Skipped)',
+          message: `Duplicate milestone "${code}" skipped.`,
+          rawPayload: JSON.stringify(raw),
+        });
+        return;
+      } else {
+        validationIssues.push({
+          id: `val-ms-ups-${rowNum}-${Date.now()}`,
+          rowNumber: rowNum,
+          entityType: 'Milestone',
+          entityCode: code,
+          field: 'code',
+          rule: 'DUPLICATE_KEY',
+          severity: 'Duplicate (Upserted)',
+          message: `Existing milestone "${code}" matched; merged completion % and status incrementally.`,
+          rawPayload: JSON.stringify(raw),
+        });
+      }
+    }
+
+    // 4. Data Transformation & Standardization
+    const rawPct = Number(String(raw.completionPercent ?? '0').replace(/[^0-9.-]/g, ''));
+    const clampedPct = Math.max(0, Math.min(100, Math.round(isNaN(rawPct) ? 0 : rawPct)));
+    const plannedDate = String(raw.plannedDate || '2026-11-30').trim();
+    const rawStatus = String(raw.status || 'In Progress').trim();
+    let status: MilestoneStatus =
+      validMilestoneStatuses.find((s) => s.toLowerCase() === rawStatus.toLowerCase()) ||
+      'In Progress';
+    if (clampedPct === 100) {
+      status = 'Completed';
+    } else if (plannedDate < currentState.referenceDate && status !== 'Completed') {
+      status = 'Overdue';
+    }
+
+    const transformedMilestone: Milestone = {
+      id: existingMsIdx >= 0 ? nextMilestones[existingMsIdx].id : `ms-etl-${code.toLowerCase()}`,
+      projectId: linkedProject.id,
+      code,
+      title,
+      owner: String(raw.owner || linkedProject.owner || 'Sopan Shinde').trim(),
+      plannedDate,
+      actualDate:
+        clampedPct === 100
+          ? String(raw.actualDate || currentState.referenceDate).trim()
+          : raw.actualDate
+          ? String(raw.actualDate).trim()
+          : null,
+      status,
+      completionPercent: clampedPct,
+      deliverableNotes: String(
+        raw.deliverableNotes || `Milestone linked to ${linkedProject.code}.`
+      ).trim(),
+      dependencyIds: existingMsIdx >= 0 ? nextMilestones[existingMsIdx].dependencyIds : [],
+      isSynthetic: true,
+      updatedAt: new Date().toISOString(),
+    };
+
+    validRecords++;
+    if (existingMsIdx >= 0) {
+      nextMilestones[existingMsIdx] = transformedMilestone;
+      updatedRecords++;
+      transformationSummary.push({
+        entityCode: code,
+        entityType: 'Milestone',
+        operation: 'UPSERT_MERGE',
+        fieldsNormalized: ['projectId (FK)', 'completionPercent', 'status'],
+        computedMetricsSummary: `Linked to ${linkedProject.code} | ${clampedPct}% (${status}) · Planned ${plannedDate}`,
+      });
+    } else {
+      nextMilestones.push(transformedMilestone);
+      insertedRecords++;
+      transformationSummary.push({
+        entityCode: code,
+        entityType: 'Milestone',
+        operation: 'INSERT',
+        fieldsNormalized: ['projectId (FK)', 'completionPercent', 'status'],
+        computedMetricsSummary: `Linked to ${linkedProject.code} | ${clampedPct}% (${status}) · Planned ${plannedDate}`,
+      });
+    }
+  });
+
   logs.push(
     `[${new Date().toISOString()}] [STAGE 2: VALIDATE] Completed schema & FK checks: ${validRecords} valid, ${duplicateRecords} duplicate(s), ${rejectedRecords} rejected.`
   );
@@ -789,7 +1000,7 @@ export function runDataIngestionPipeline(
       options.dryRunOnly
         ? `[${completedAt}] [STAGE 4: DRY-RUN PREVIEW] Dry-run validation completed without mutating SQLite tables.`
         : `[${completedAt}] [STAGE 4: STORAGE] Committed ${insertedRecords} insert(s) and ${updatedRecords} update(s) to SQLite relational tables.`,
-      `[${completedAt}] [STAGE 5: KPI ENGINE] Recalculated portfolio KPIs across ${nextProjects.length} projects and ${nextTasks.length} tasks.`,
+      `[${completedAt}] [STAGE 5: KPI ENGINE] Recalculated portfolio KPIs across ${nextProjects.length} projects, ${nextTasks.length} tasks, and ${nextMilestones.length} milestones.`,
     ],
   };
 
@@ -805,6 +1016,7 @@ export function runDataIngestionPipeline(
     ...currentState,
     projects: nextProjects,
     tasks: nextTasks,
+    milestones: nextMilestones,
     etlRuns: [runRecord, ...(currentState.etlRuns || SEED_ETL_RUNS)],
   };
 
@@ -1133,5 +1345,164 @@ export function computeDataQualityAudit(
         currentCalculatedValue: `Green: ${computedKpis.healthDistribution.Green} | Amber: ${computedKpis.healthDistribution.Amber} | Red: ${computedKpis.healthDistribution.Red}`,
       },
     ],
+  };
+}
+
+export interface OverdueTaskRecord {
+  id: string;
+  code: string;
+  title: string;
+  projectCode: string;
+  projectName: string;
+  department: Department;
+  assigneeName: string;
+  dueDate: string;
+  daysOverdue: number;
+  status: TaskStatus;
+  priority: ProjectPriority;
+  loggedRatio: string;
+}
+
+export interface OverdueMilestoneRecord {
+  id: string;
+  code: string;
+  title: string;
+  projectCode: string;
+  projectName: string;
+  department: Department;
+  owner: string;
+  plannedDate: string;
+  daysOverdue: number;
+  completionPercent: number;
+  completionGap: number;
+  status: MilestoneStatus;
+  deliverableNotes: string;
+}
+
+export interface OverdueAndPerformanceAnalysis {
+  referenceDate: string;
+  overdueTasks: OverdueTaskRecord[];
+  overdueMilestones: OverdueMilestoneRecord[];
+  blockedTasksCount: number;
+  impactedProjectCodes: string[];
+  measuredTelemetry: {
+    totalConsolidatedRecords: number;
+    historicalRecordsProcessed: number;
+    historicalValidationFailures: number;
+    kpiCalculationTimeMs: number;
+    reportGenerationTimeMs: number;
+    generatedReportTitle: string;
+  };
+}
+
+function diffDaysBetweenDates(earlierIso: string, laterIso: string): number {
+  const d1 = new Date(`${earlierIso}T00:00:00Z`).getTime();
+  const d2 = new Date(`${laterIso}T00:00:00Z`).getTime();
+  if (isNaN(d1) || isNaN(d2)) return 0;
+  return Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Computes real-time Overdue Task & Milestone Schedule Slippage Analysis and
+ * measures actual KPI calculation & report-generation execution performance.
+ */
+export function computeOverdueAndPerformanceAnalysis(
+  state: PortfolioState
+): OverdueAndPerformanceAnalysis {
+  const kpiStart = performance.now();
+  const kpis = computeDashboardKPIs(state);
+  const kpiElapsedMs = Math.max(0.4, Math.round((performance.now() - kpiStart) * 100) / 100);
+
+  const reportStart = performance.now();
+  const sampleReport = buildEvidenceReportFromState(
+    state,
+    'Weekly',
+    `Automated ETL & Schedule Slippage Audit (${state.referenceDate})`,
+    'delay_analysis',
+    'Weekly Executive Summary'
+  );
+  const reportElapsedMs = Math.max(0.5, Math.round((performance.now() - reportStart) * 100) / 100);
+
+  const projMap = new Map(state.projects.map((p) => [p.id, p]));
+
+  const overdueTasks: OverdueTaskRecord[] = (state.tasks || [])
+    .filter((t) => isTaskOverdue(t, state.referenceDate))
+    .map((t) => {
+      const p = projMap.get(t.projectId);
+      return {
+        id: t.id,
+        code: t.code,
+        title: t.title,
+        projectCode: p?.code || 'UNMAPPED',
+        projectName: p?.name || 'Unmapped Engagement',
+        department: p?.department || 'Technology',
+        assigneeName: t.assigneeName,
+        dueDate: t.dueDate,
+        daysOverdue: diffDaysBetweenDates(t.dueDate, state.referenceDate),
+        status: t.status,
+        priority: t.priority,
+        loggedRatio: `${t.actualHours}h / ${t.estimatedHours}h`,
+      };
+    })
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const overdueMilestones: OverdueMilestoneRecord[] = state.milestones
+    .filter((m) => isMilestoneOverdue(m, state.referenceDate))
+    .map((m) => {
+      const p = projMap.get(m.projectId);
+      return {
+        id: m.id,
+        code: m.code,
+        title: m.title,
+        projectCode: p?.code || 'UNMAPPED',
+        projectName: p?.name || 'Unmapped Engagement',
+        department: p?.department || 'Technology',
+        owner: m.owner,
+        plannedDate: m.plannedDate,
+        daysOverdue: diffDaysBetweenDates(m.plannedDate, state.referenceDate),
+        completionPercent: m.completionPercent,
+        completionGap: 100 - m.completionPercent,
+        status: m.status,
+        deliverableNotes: m.deliverableNotes,
+      };
+    })
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const impactedSet = new Set<string>([
+    ...overdueTasks.map((t) => t.projectCode),
+    ...overdueMilestones.map((m) => m.projectCode),
+  ]);
+
+  const runs = state.etlRuns && state.etlRuns.length > 0 ? state.etlRuns : SEED_ETL_RUNS;
+  const historicalRecordsProcessed = runs.reduce((s, r) => s + r.totalRecords, 0);
+  const historicalValidationFailures = runs.reduce((s, r) => s + r.rejectedRecords, 0);
+
+  const totalConsolidatedRecords =
+    state.projects.length +
+    state.milestones.length +
+    state.milestoneHistory.length +
+    (state.tasks || []).length +
+    state.risks.length +
+    (state.issues || []).length +
+    (state.dependencies || []).length +
+    (state.teamMembers || []).length +
+    (state.activityLog || []).length +
+    state.reports.length +
+    runs.length;
+
+  return {
+    referenceDate: state.referenceDate,
+    overdueTasks,
+    overdueMilestones,
+    blockedTasksCount: kpis.blockedTasks,
+    impactedProjectCodes: Array.from(impactedSet),
+    measuredTelemetry: {
+      totalConsolidatedRecords,
+      historicalRecordsProcessed,
+      historicalValidationFailures,
+      kpiCalculationTimeMs: kpiElapsedMs,
+      reportGenerationTimeMs: reportElapsedMs,
+      generatedReportTitle: sampleReport.title,
+    },
   };
 }

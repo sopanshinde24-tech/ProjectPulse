@@ -25,6 +25,7 @@ import {
   PortfolioState,
   UserAppRole,
 } from '../types/portfolio';
+import { SOPAN_SHINDE_AVATAR_URL } from '../data/seedData';
 import { formatCurrency } from '../utils/calculations';
 import { exportProjectsToCSV, triggerCSVDownload } from '../utils/csvExport';
 
@@ -78,7 +79,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const activeTeamMember = useMemo(() => {
     const members = state.teamMembers || [];
-    return (
+    const found =
       members.find((tm) => tm.name.toLowerCase() === currentUserName.toLowerCase()) ||
       members[0] || {
         id: 'tm-1',
@@ -90,8 +91,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         location: 'Mumbai (BKC)',
         weeklyCapacityHours: 40,
         avatarInitials: 'SS',
-      }
-    );
+        avatarUrl: SOPAN_SHINDE_AVATAR_URL,
+      };
+    if (found.name.toLowerCase() === 'sopan shinde' && !found.avatarUrl) {
+      return { ...found, avatarUrl: SOPAN_SHINDE_AVATAR_URL };
+    }
+    return found;
   }, [state.teamMembers, currentUserName]);
 
   const activeWorkload = useMemo(() => {
@@ -276,9 +281,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <div className="p-3 rounded-md bg-slate-50 border border-slate-200/90 shadow-2xs space-y-2">
               <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-md bg-[#0F172A] text-white font-mono text-xs font-bold flex items-center justify-center shrink-0 shadow-xs border border-slate-700">
-                  {activeTeamMember.avatarInitials}
-                </span>
+                {activeTeamMember.avatarUrl ? (
+                  <img
+                    src={activeTeamMember.avatarUrl}
+                    alt={activeTeamMember.name}
+                    className="w-10 h-10 rounded-md object-cover object-top shrink-0 shadow-xs border border-slate-300 bg-white"
+                  />
+                ) : (
+                  <span className="w-10 h-10 rounded-md bg-[#0F172A] text-white font-mono text-xs font-bold flex items-center justify-center shrink-0 shadow-xs border border-slate-700">
+                    {activeTeamMember.avatarInitials}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <div className="font-bold text-slate-900 truncate">{activeTeamMember.name}</div>
                   <div className="text-[10px] font-mono text-[#D04A02] font-semibold truncate">
@@ -316,9 +329,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="fin-card-dark text-white p-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 border-b border-slate-800/90 pb-5">
                   <div className="flex items-start sm:items-center gap-4">
-                    <div className="w-16 h-16 rounded-md bg-[#D04A02] text-white font-mono text-xl font-extrabold flex items-center justify-center border border-orange-300/40 shadow-md shrink-0">
-                      {activeTeamMember.avatarInitials}
-                    </div>
+                    {activeTeamMember.avatarUrl ? (
+                      <img
+                        src={activeTeamMember.avatarUrl}
+                        alt={activeTeamMember.name}
+                        className="w-16 h-16 rounded-md object-cover object-top border-2 border-[#D04A02] shadow-md shrink-0 bg-white"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-md bg-[#D04A02] text-white font-mono text-xl font-extrabold flex items-center justify-center border border-orange-300/40 shadow-md shrink-0">
+                        {activeTeamMember.avatarInitials}
+                      </div>
+                    )}
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[10px] font-bold uppercase">
@@ -767,6 +788,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   {(state.teamMembers || []).map((tm) => {
                     const isCurrent =
                       tm.name === currentUserName && tm.appRole === currentUserRole;
+                    const memberAvatar =
+                      tm.avatarUrl ||
+                      (tm.name.toLowerCase() === 'sopan shinde' ? SOPAN_SHINDE_AVATAR_URL : undefined);
                     return (
                       <div
                         key={tm.id}
@@ -778,15 +802,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className={`w-9 h-9 rounded-md font-mono text-xs font-bold flex items-center justify-center shrink-0 shadow-2xs ${
-                              isCurrent
-                                ? 'bg-[#D04A02] text-white'
-                                : 'bg-slate-900 text-white'
-                            }`}
-                          >
-                            {tm.avatarInitials}
-                          </span>
+                          {memberAvatar ? (
+                            <img
+                              src={memberAvatar}
+                              alt={tm.name}
+                              className="w-9 h-9 rounded-md object-cover object-top shrink-0 shadow-2xs border border-slate-300 bg-white"
+                            />
+                          ) : (
+                            <span
+                              className={`w-9 h-9 rounded-md font-mono text-xs font-bold flex items-center justify-center shrink-0 shadow-2xs ${
+                                isCurrent
+                                  ? 'bg-[#D04A02] text-white'
+                                  : 'bg-slate-900 text-white'
+                              }`}
+                            >
+                              {tm.avatarInitials}
+                            </span>
+                          )}
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 truncate">{tm.name}</div>
                             <div className="text-[11px] text-slate-500 truncate">

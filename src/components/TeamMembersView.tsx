@@ -13,6 +13,7 @@ import {
   TeamMember,
   UserAppRole,
 } from '../types/portfolio';
+import { SOPAN_SHINDE_AVATAR_URL } from '../data/seedData';
 import { DEPARTMENTS } from '../utils/calculations';
 
 interface TeamMembersViewProps {
@@ -179,9 +180,17 @@ export const TeamMembersView: React.FC<TeamMembersViewProps> = ({
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-slate-900 text-white font-mono font-bold text-sm flex items-center justify-center shrink-0">
-                      {tm.avatarInitials}
-                    </div>
+                    {tm.avatarUrl || tm.name.toLowerCase() === 'sopan shinde' ? (
+                      <img
+                        src={tm.avatarUrl || SOPAN_SHINDE_AVATAR_URL}
+                        alt={tm.name}
+                        className="w-10 h-10 rounded-md object-cover object-top border border-slate-300 shadow-2xs shrink-0 bg-white"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-slate-900 text-white font-mono font-bold text-sm flex items-center justify-center shrink-0">
+                        {tm.avatarInitials}
+                      </div>
+                    )}
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">{tm.name}</h3>
                       <p className="text-xs text-slate-600 line-clamp-1">{tm.designation}</p>

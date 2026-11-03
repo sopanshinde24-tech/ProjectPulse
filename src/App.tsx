@@ -53,7 +53,7 @@ import { SettingsView } from './components/SettingsView';
 import { TasksDeliverablesView } from './components/TasksDeliverablesView';
 import { TeamMembersView } from './components/TeamMembersView';
 import { TimelineGanttView } from './components/TimelineGanttView';
-import { createInitialSeedState } from './data/seedData';
+import { createInitialSeedState, SOPAN_SHINDE_AVATAR_URL } from './data/seedData';
 import {
   ActiveModuleId,
   ActivityLogEntry,
@@ -1404,14 +1404,22 @@ export default function App() {
                 : 'border-slate-200/95 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-900 shadow-2xs'
             }`}
           >
-            <span className="w-6 h-6 rounded bg-[#0F172A] text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0 border border-slate-700">
-              {currentUserName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()}
-            </span>
+            {currentUserName.toLowerCase() === 'sopan shinde' ? (
+              <img
+                src={SOPAN_SHINDE_AVATAR_URL}
+                alt={currentUserName}
+                className="w-7 h-7 rounded-md object-cover object-top shrink-0 border border-slate-300 shadow-2xs bg-white"
+              />
+            ) : (
+              <span className="w-7 h-7 rounded-md bg-[#0F172A] text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0 border border-slate-700">
+                {currentUserName
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            )}
             <div className="text-left leading-tight">
               <div className="text-xs font-bold text-slate-900">{currentUserName}</div>
               <div className="text-[10px] font-mono text-[#D04A02] font-semibold">
@@ -1594,14 +1602,22 @@ export default function App() {
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="w-9 h-9 rounded-md bg-[#D04A02] text-white font-mono text-xs font-extrabold flex items-center justify-center shrink-0 border border-orange-300/30 shadow-xs">
-                  {currentUserName
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </span>
+                {currentUserName.toLowerCase() === 'sopan shinde' ? (
+                  <img
+                    src={SOPAN_SHINDE_AVATAR_URL}
+                    alt={currentUserName}
+                    className="w-10 h-10 rounded-md object-cover object-top shrink-0 border border-orange-300/50 shadow-xs bg-white"
+                  />
+                ) : (
+                  <span className="w-10 h-10 rounded-md bg-[#D04A02] text-white font-mono text-xs font-extrabold flex items-center justify-center shrink-0 border border-orange-300/30 shadow-xs">
+                    {currentUserName
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-white truncate">
                     {currentUserName}
@@ -1646,14 +1662,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* Scrollable 5-Group Module Explorer */}
-        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+        {/* Scrollable 5-Group Module Explorer — Enterprise Financial Dashboard Density */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
           {sidebarGroups.map((group) => (
             <div key={group.groupLabel} className="space-y-1">
-              <div className="px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                {group.groupLabel}
+              <div className="px-2.5 py-1 flex items-center justify-between border-b border-slate-100">
+                <span className="inline-flex items-center self-center text-[10px] font-mono font-bold uppercase tracking-[0.08em] text-slate-400 leading-none">
+                  {group.groupLabel}
+                </span>
+                <span className="self-center inline-flex items-center justify-center text-[9px] font-mono tabular-nums text-slate-400 leading-none">
+                  {group.items.length}
+                </span>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const isSelected = activeModule === item.id;
@@ -1667,26 +1688,36 @@ export default function App() {
                           setIsDrawerOpen(false);
                         }
                       }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                      className={`group w-full flex items-center justify-between gap-3 px-2.5 py-1 rounded-md text-xs leading-none border-l-2 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-[#0F172A] text-white font-semibold border-l-2 border-[#D04A02] shadow-xs'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                          ? 'bg-[#0F172A] text-white font-semibold border-l-[#D04A02] shadow-xs'
+                          : 'border-l-transparent text-slate-700 font-medium hover:bg-slate-100/90 hover:text-slate-900'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
+                      <div className="flex items-center gap-3 min-w-0 flex-1 self-center">
+                        <span className="w-4 h-4 inline-flex items-center justify-center shrink-0 self-center">
+                          <Icon
+                            className={`w-4 h-4 shrink-0 transition-colors ${
+                              isSelected
+                                ? 'text-[#FDBA74]'
+                                : 'text-slate-500 group-hover:text-slate-900'
+                            }`}
+                          />
+                        </span>
+                        <span className="inline-flex items-center self-center truncate leading-none tracking-[-0.01em] text-left">
+                          {item.label}
+                        </span>
                       </div>
                       {item.badge && (
                         <span
-                          className={`font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded border ${
+                          className={`self-center inline-flex items-center justify-center min-w-[40px] h-5 px-1.5 rounded font-mono tabular-nums text-[10px] leading-none tracking-tight border shrink-0 ${
                             isSelected
                               ? 'bg-slate-800 border-slate-700 text-[#FDBA74] font-bold'
                               : item.badgeTone === 'danger'
                               ? 'bg-red-50 border-red-200 text-red-700 font-bold'
                               : item.badgeTone === 'warning'
                               ? 'bg-amber-50 border-amber-200 text-amber-800 font-bold'
-                              : 'bg-slate-100 border-slate-200/80 text-slate-600'
+                              : 'bg-slate-100 border-slate-200/90 text-slate-600 font-semibold'
                           }`}
                         >
                           {item.badge}
@@ -1706,13 +1737,19 @@ export default function App() {
               setIsChatbotOpen(true);
               if (!isDrawerPinned) setIsDrawerOpen(false);
             }}
-            className="w-full mt-2 flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-xs font-semibold bg-orange-50/90 hover:bg-orange-100 text-[#D04A02] border border-orange-200 shadow-2xs transition-colors cursor-pointer"
+            className="w-full mt-2 flex items-center justify-between gap-3 px-2.5 py-1 rounded-md text-xs font-semibold leading-none bg-orange-50/90 hover:bg-orange-100 text-[#D04A02] border border-orange-200 border-l-2 border-l-[#D04A02] shadow-2xs transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 shrink-0" />
-              <span>Ask PwC AI Copilot</span>
+            <div className="flex items-center gap-3 min-w-0 flex-1 self-center">
+              <span className="w-4 h-4 inline-flex items-center justify-center shrink-0 self-center">
+                <Bot className="w-4 h-4 shrink-0" />
+              </span>
+              <span className="inline-flex items-center self-center truncate leading-none text-left">
+                Ask PwC AI Copilot
+              </span>
             </div>
-            <span className="font-mono text-[10px] font-bold">LIVE</span>
+            <span className="self-center inline-flex items-center justify-center min-w-[40px] h-5 px-1.5 rounded bg-orange-100 border border-orange-300/80 font-mono text-[10px] font-bold leading-none shrink-0">
+              LIVE
+            </span>
           </button>
         </div>
 
@@ -1755,16 +1792,18 @@ export default function App() {
         }`}
       >
         {/* Quick Explore Bar for Instant Tab Switching or Opening the 3-Line Drawer */}
-        <div className="no-print bg-white border-b border-slate-200 px-4 lg:px-6 py-2 flex items-center gap-2 overflow-x-auto">
+        <div className="no-print bg-white border-b border-slate-200 px-4 lg:px-6 py-2 flex items-center gap-1.5 overflow-x-auto">
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shrink-0 cursor-pointer"
+            className="h-7 inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-bold leading-none bg-slate-900 text-white hover:bg-slate-800 shrink-0 cursor-pointer"
           >
-            <Menu className="w-3.5 h-3.5 text-[#FDBA74]" />
+            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+              <Menu className="w-3.5 h-3.5 text-[#FDBA74]" />
+            </span>
             <span>All 16 Modules</span>
           </button>
-          <span className="text-slate-300">|</span>
+          <span className="text-slate-300 px-0.5">|</span>
           {sidebarGroups
             .flatMap((g) => g.items)
             .map((item) => {
@@ -1775,14 +1814,31 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveModule(item.id)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors shrink-0 cursor-pointer ${
+                  className={`h-7 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs leading-none whitespace-nowrap transition-colors shrink-0 cursor-pointer border ${
                     active
-                      ? 'bg-orange-50 text-[#D04A02] border border-orange-200 font-semibold'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-orange-50 text-[#D04A02] border-orange-200 font-semibold shadow-2xs'
+                      : 'border-transparent text-slate-600 font-medium hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
                   <span>{item.label}</span>
+                  {item.badge && (
+                    <span
+                      className={`ml-0.5 px-1.5 h-4 inline-flex items-center justify-center rounded font-mono tabular-nums text-[9px] leading-none border ${
+                        active
+                          ? 'bg-white border-orange-200 text-[#D04A02] font-bold'
+                          : item.badgeTone === 'danger'
+                          ? 'bg-red-50 border-red-200 text-red-700 font-bold'
+                          : item.badgeTone === 'warning'
+                          ? 'bg-amber-50 border-amber-200 text-amber-800 font-bold'
+                          : 'bg-slate-100 border-slate-200/80 text-slate-500'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
