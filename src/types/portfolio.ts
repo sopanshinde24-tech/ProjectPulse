@@ -304,9 +304,102 @@ export interface PortfolioState {
   dependencies?: TaskDependency[];
   teamMembers?: TeamMember[];
   activityLog?: ActivityLogEntry[];
+  etlRuns?: ETLPipelineRun[];
   reports: ExecutiveReport[];
   referenceDate: string;
   storageMode?: 'sqlite-server' | 'local-fallback';
+}
+
+export type ETLSourceFormat = 'CSV' | 'JSON' | 'REST API';
+export type ETLEntityTarget = 'Projects' | 'Tasks' | 'Combined Batch';
+export type ETLImportMode = 'upsert' | 'skip_duplicates' | 'strict_reject_duplicates';
+
+export interface ETLValidationIssue {
+  id: string;
+  rowNumber: number;
+  entityType: 'Project' | 'Task' | 'Milestone' | 'Risk' | 'Issue';
+  entityCode: string;
+  field: string;
+  rule:
+    | 'REQUIRED_FIELD'
+    | 'SCHEMA_TYPE_ERROR'
+    | 'DUPLICATE_KEY'
+    | 'FOREIGN_KEY_ORPHAN'
+    | 'DOMAIN_RANGE_VIOLATION';
+  severity: 'Rejected' | 'Duplicate (Upserted)' | 'Duplicate (Skipped)' | 'Normalized Warning';
+  message: string;
+  rawPayload: string;
+}
+
+export interface ETLTransformationItem {
+  entityCode: string;
+  entityType: 'Project' | 'Task';
+  operation: 'INSERT' | 'UPSERT_MERGE' | 'REJECTED' | 'SKIPPED_DUPLICATE';
+  fieldsNormalized: string[];
+  computedMetricsSummary: string;
+}
+
+export interface ETLPipelineRun {
+  id: string;
+  runCode: string;
+  batchName: string;
+  sourceFormat: ETLSourceFormat;
+  entityTarget: ETLEntityTarget;
+  importMode: ETLImportMode;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  status: 'Completed' | 'Completed with Warnings' | 'Rejected';
+  totalRecords: number;
+  validRecords: number;
+  insertedRecords: number;
+  updatedRecords: number;
+  duplicateRecords: number;
+  rejectedRecords: number;
+  qualityScore: number;
+  triggeredBy: string;
+  validationIssues: ETLValidationIssue[];
+  transformationSummary: ETLTransformationItem[];
+  executionLogs: string[];
+}
+
+export interface DataQualityDimension {
+  dimension:
+    | 'Completeness'
+    | 'Referential Integrity'
+    | 'Uniqueness'
+    | 'Domain Validity'
+    | 'Timeliness & Freshness';
+  score: number;
+  passedRecords: number;
+  totalChecked: number;
+  ruleDescription: string;
+  status: 'Optimal' | 'Attention' | 'Critical';
+}
+
+export interface RelationalIntegrityCheck {
+  relationship: string;
+  childTable: string;
+  parentTable: string;
+  foreignKeyColumn: string;
+  totalChildRows: number;
+  validLinkedRows: number;
+  orphanedRows: number;
+  status: 'Verified (0 Orphans)' | 'Orphan Detected';
+}
+
+export interface DataQualityAudit {
+  overallScore: number;
+  totalDatabaseRecords: number;
+  dimensions: DataQualityDimension[];
+  relationalChecks: RelationalIntegrityCheck[];
+  kpiFormulaRegistry: {
+    kpiName: string;
+    category: 'Schedule' | 'Financial' | 'Governance' | 'Resource' | 'Execution';
+    sqlAndMathFormula: string;
+    sourceTables: string;
+    currentCalculatedValue: string;
+  }[];
 }
 
 export interface BudgetMetrics {
@@ -425,6 +518,7 @@ export type ActiveModuleId =
   | 'risks'
   | 'issues'
   | 'budget'
+  | 'data-pipeline'
   | 'ai-assistant'
   | 'reports'
   | 'team'
@@ -440,3 +534,4 @@ export interface GuidedDemoStep {
   evidenceCallout: string;
   actionLabel: string;
 }
+

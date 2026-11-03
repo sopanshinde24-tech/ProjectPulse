@@ -159,3 +159,40 @@ CREATE TABLE IF NOT EXISTS executive_reports (
   kpi_snapshot_json TEXT NOT NULL,
   is_ai_generated INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS etl_pipeline_runs (
+  id TEXT PRIMARY KEY,
+  run_code TEXT NOT NULL,
+  batch_name TEXT NOT NULL,
+  source_format TEXT NOT NULL,
+  entity_target TEXT NOT NULL,
+  import_mode TEXT NOT NULL DEFAULT 'upsert',
+  started_at TEXT NOT NULL,
+  completed_at TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL DEFAULT 42,
+  status TEXT NOT NULL,
+  total_records INTEGER NOT NULL,
+  valid_records INTEGER NOT NULL,
+  inserted_records INTEGER NOT NULL,
+  updated_records INTEGER NOT NULL,
+  duplicate_records INTEGER NOT NULL,
+  rejected_records INTEGER NOT NULL,
+  quality_score REAL NOT NULL,
+  triggered_by TEXT NOT NULL,
+  validation_issues_json TEXT NOT NULL DEFAULT '[]',
+  transformation_summary_json TEXT NOT NULL DEFAULT '[]',
+  execution_logs_json TEXT NOT NULL DEFAULT '[]'
+);
+
+-- Relational & Analytical Query Indexes
+CREATE INDEX IF NOT EXISTS idx_projects_code ON projects(code);
+CREATE INDEX IF NOT EXISTS idx_projects_dept_status ON projects(department, status);
+CREATE INDEX IF NOT EXISTS idx_milestones_project_date ON milestones(project_id, planned_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_status_due ON tasks(project_id, status, due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_risks_project_score ON risks(project_id, risk_score DESC);
+CREATE INDEX IF NOT EXISTS idx_issues_project_status ON issues(project_id, status);
+CREATE INDEX IF NOT EXISTS idx_dependencies_project ON dependencies(project_id);
+CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_etl_runs_started ON etl_pipeline_runs(started_at DESC);
+

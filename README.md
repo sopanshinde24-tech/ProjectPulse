@@ -1,93 +1,136 @@
-# ProjectPulse AI — Project Management Office & Portfolio Intelligence Dashboard
+# ProjectPulse AI — Enterprise Project Data Integration, Processing & Portfolio Intelligence Platform
 
-**ProjectPulse AI** is an enterprise Project Management Office (PMO) and Portfolio Intelligence application built with React 19, TypeScript, Tailwind CSS, Express, SQLite (`better-sqlite3`), and the `@google/genai` SDK (`gemini-3.8-flash`).
-
-Every KPI, chart, filter, milestone overdue count, budget variance, quantitative risk score, and AI executive report is dynamically calculated from the underlying relational dataset. All pre-loaded records are explicitly labeled as **Synthetic Demonstration Data**.
+**ProjectPulse AI** (PwC India Advisory Edition · Default Executive Profile: **Sopan Shinde**) is a full-stack Project Portfolio Management (PPM), Data Engineering (ETL), and Business Intelligence platform built with **React 19, TypeScript, Tailwind CSS v4, Express, and SQLite 3 (WAL mode)**.
 
 ---
 
-## 1. Functional Modules
+## 1. System Architecture
 
-1. **Executive Dashboard**
-   - Dynamically computes Total, Active, Completed, Delayed, and At-Risk project counts.
-   - Displays Portfolio Allocated Budget (`$14,550,000`), Actual Spend (`$14,405,000`), Net Variance, and Utilization `%`.
-   - Project Health Distribution (`Green`, `Amber`, `Red`) with proportional bar and click-through filtering.
-   - Department-wise performance (`Technology`, `Finance`, `Operations`, `Marketing`), milestone completion rates, and an interactive **Management Attention Queue**.
-2. **Project Portfolio**
-   - Full Create, Read, Update, Delete (CRUD) lifecycle plus detailed **Project Inspector** slide-over drawer.
-   - Search and multi-facet filtering by Owner, Department, Status, Health, Risk Tier, and Over-Budget status.
-   - RFC-4180 CSV Import and Export.
-3. **Milestone Tracking**
-   - Add and update milestones with planned versus actual completion dates.
-   - Automatic overdue detection relative to the portfolio reference date (`2026-11-02`) with exact days-late calculation.
-   - Chronological **Milestone Progress History** audit log recording every completion percentage and status change.
-4. **Risk Management**
-   - Interactive **5×5 Probability × Impact Matrix** (`Risk Score = Probability × Impact`, scale `1–25`).
-   - Quantitative Risk Register with filtering for Critical (`Score >= 16`), High (`12–15`), Medium (`6–10`), Low (`1–5`), and Unresolved statuses.
-   - Inline mitigation progress slider (`0–100%`) and status controls (`Open`, `Mitigating`, `Resolved`).
-5. **Budget Monitoring**
-   - Portfolio and project-level budget versus actual expenditure ledger.
-   - Deterministic variance (`Actual Spend - Allocated Budget`) and utilization (`(Actual / Allocated) × 100`) calculations.
-   - One-click filter for projects exceeding budget and department-wise financial analysis.
-6. **Management Reporting**
-   - Generate and archive **Weekly** and **Monthly** governance packets.
-   - Includes project health breakdown, overdue milestones, budget variances, unresolved major risks, and evidence-backed follow-up actions.
-   - Export reports to **CSV** and print-formatted **PDF**.
-7. **AI Executive Assistant**
-   - Server-side Gemini integration (`POST /api/ai/executive-report` using `gemini-3.8-flash` with structured JSON `responseSchema`).
-   - Synthesizes management summaries strictly from real portfolio records—never inventing figures, statuses, or milestones.
-   - Explains which recorded evidence supports each recommendation and provides a **Human Review & Edit Workbench** prior to approval and export.
-8. **QA & Video Package Inspector**
-   - Runs all 8 automated QA verification suites live in the browser against current records, displays `/schema.sql`, and provides full access to `/video-assets`.
-
----
-
-## 2. Automatic Recruiter Guided Demo (9-Step Workflow)
-
-Click **Start Guided Demo** in the top navigation bar to run the automated or step-controlled 9-step business workflow:
-1. Open the **Executive Dashboard**.
-2. Identify delayed and at-risk projects from calculated KPIs.
-3. Open delayed project **`PRJ-102 · Core Banking Ledger Modernization`**.
-4. Inspect its overdue milestone (**`MS-102-2 · Mainframe Dual-Write Cutover`**).
-5. Inspect its budget variance (**`+$190,000`** overrun, **`107.9%`** utilization).
-6. Open the **Risk Register** and review high-impact risk **`RSK-102-A`** (`Score 20/25 · Critical`).
-7. Execute a live state update: complete **`MS-102-2 (100%)`** and advance **`RSK-102-A`** mitigation to **`85%`**.
-8. Return to the **Executive Dashboard** and verify recalculated KPIs (`Overdue Milestones` drops from `4` to `3`; `PRJ-102` progress rises from `58%` to `74%`).
-9. Open the **AI Executive Assistant** and generate a weekly executive report from the updated dataset.
-
-Includes **Auto-Play / Pause**, **Previous / Next Step**, **Reset Demo Data**, and **Explore Manually** controls.
-
----
-
-## 3. Database Schema & Persistence
-
-- **Relational Schema**: Defined in [`/schema.sql`](./schema.sql) with 5 normalized tables: `projects`, `milestones`, `milestone_history`, `risks`, and `executive_reports`.
-- **Dual-Layer Persistence**: Stored in an embedded SQLite database (`projectpulse.db`) via Express REST routes (`/api/portfolio`, `/api/portfolio/sync`, `/api/portfolio/reset`) with automatic client-side `localStorage` fallback.
-
----
-
-## 4. Running & Testing
-
-```bash
-# Start full-stack Express + Vite server on port 3000
-npm run dev
-
-# Run the automated 8-suite QA & Data Integrity tests
-npm test
-
-# Type-check and build for production
-npm run lint
-npm run build
+```
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND CLIENT (React 19 + TypeScript)                   │
+│  • Executive Dashboard    • Project Portfolio & 8-Tab Details  • Tasks & Kanban   │
+│  • Milestones & Gantt     • Risk Matrix & Issues/Dependencies  • Budget & Team    │
+│  • Data Pipeline & ETL    • AI Project Assistant & Copilot     • Reports & QA     │
+└───────────────────────────────────────┬───────────────────────────────────────────┘
+                                        │ REST API (JSON + RBAC `x-user-role`)
+┌───────────────────────────────────────▼───────────────────────────────────────────┐
+│                     BACKEND DATA & API SERVER (Express + Node.js)                 │
+│  • 6-Stage ETL Pipeline Engine (`src/utils/dataEngineering.ts`)                   │
+│  • Deterministic KPI & Financial Variance Engine (`src/utils/calculations.ts`)    │
+│  • 5-Dimension Data Quality & Foreign-Key Audit Engine                            │
+│  • Grounded Gemini 3.8 Flash + Deterministic PMO Copilot (`/api/ai/*`)            │
+└───────────────────────────────────────┬───────────────────────────────────────────┘
+                                        │ Atomic SQLite Transactions (WAL Mode)
+┌───────────────────────────────────────▼───────────────────────────────────────────┐
+│                     RELATIONAL DATABASE (`projectpulse.db` / `schema.sql`)        │
+│  11 Tables: `projects`, `milestones`, `milestone_history`, `tasks`, `risks`,      │
+│  `issues`, `dependencies`, `team_members`, `activity_log`, `executive_reports`,   │
+│  `etl_pipeline_runs` + 10 Relational & Analytical Indexes                         │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Video & Presentation Package (`/video-assets`)
+## 2. End-to-End Data Flow Diagram (6-Stage ETL Pipeline)
 
-All production scripts, storyboards, voiceover narration tracks, SRT captions, and shot timings for **Video A (Problem & Solution, 45–60s)** and **Video B (Live Product Demo, 60–90s)** are located in [`/video-assets`](./video-assets):
-- `/video-assets/problem_solution_script.md`
-- `/video-assets/demo_walkthrough_script.md`
-- `/video-assets/storyboard.md`
-- `/video-assets/voiceover.md`
-- `/video-assets/captions.srt`
-- `/video-assets/shot_list.md`
+```
+[1. Data Import] (CSV / JSON / REST API Connector)
+       │
+       ▼
+[2. Schema & Relational Validation]
+   ├─ Required-Field Check (`code`, `name`/`title`, `projectCode`)
+   ├─ Domain Range Check (`progress 0..100`, `allocatedBudget > 0`, `endDate >= startDate`)
+   ├─ Duplicate Key Detection (`upsert`, `skip_duplicates`, or `strict_reject_duplicates`)
+   └─ Foreign-Key Referential Integrity (`tasks.project_id -> projects.id`)
+       │
+       ├──► Invalid / Orphaned Rows ──► [Quarantine & Rejected-Record Inspector]
+       │
+       ▼ Valid Rows
+[3. Data Transformation & Normalization]
+   ├─ Clamp progress [0..100] & normalize status / priority enums
+   ├─ Compute `budgetVariance = actualSpend - allocatedBudget`
+   ├─ Compute `utilizationPercent = (actualSpend / allocatedBudget) * 100`
+   └─ Bind relational foreign keys (`projectId`, `assigneeId`)
+       │
+       ▼
+[4. Relational Database Storage (SQLite 3 WAL)]
+   └─ Atomic transaction upserting `projects`, `tasks`, `etl_pipeline_runs`, and `activity_log`
+       │
+       ▼
+[5. Live KPI & Data Quality Recalculation]
+   └─ Recompute portfolio health (G/A/R), team capacity utilization, and 5-dimension Data Quality score
+       │
+       ▼
+[6. Analytical Reporting & Grounded AI Assistant]
+   └─ Evidence-cited executive reports, RFC-4180 CSV exports, and AI Copilot Q&A
+```
+
+---
+
+## 3. Relational Database ER Diagram (`schema.sql`)
+
+```
+[team_members] (PK: id) 1 ────────── * [tasks] (PK: id, UK: code, FK: project_id, assignee_id)
+                                          │
+[projects] (PK: id, UK: code) 1 ──────────┼──── * [milestones] (PK: id, UK: code, FK: project_id)
+   │                                      │            │
+   ├──── * [risks] (FK: project_id)       │            └──── * [milestone_history] (FK: milestone_id)
+   ├──── * [issues] (FK: project_id)      │
+   ├──── * [dependencies] (FK: project_id, blocking_task_id, blocked_task_id)
+   └──── * [activity_log] (FK: project_id)
+
+[executive_reports] (PK: id)             [etl_pipeline_runs] (PK: id, UK: run_code)
+```
+
+---
+
+## 4. REST API Documentation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/portfolio` | Retrieves complete relational portfolio state across all 11 SQLite tables. |
+| `POST` | `/api/portfolio/sync` | Synchronizes portfolio mutations in an atomic SQLite transaction (enforces RBAC via `x-user-role`). |
+| `POST` | `/api/portfolio/reset` | Resets SQLite database to the baseline 12 PwC India engagements, 27 milestones, 20 tasks, and 10 risks. |
+| `GET` | `/api/projects` | Retrieves projects with computed budget variance, utilization %, health, and optional `department`/`status` filters. |
+| `GET` | `/api/tasks` | Retrieves tasks with joined parent project metadata and overdue status against `referenceDate`. |
+| `GET` | `/api/analytics/kpis` | Returns live calculated portfolio KPIs, 5-dimension Data Quality scorecard, and 7 FK integrity checks. |
+| `GET` | `/api/etl/history` | Returns all historical and user-triggered ETL pipeline runs (`etl_pipeline_runs`). |
+| `POST` | `/api/etl/validate` | Dry-run ETL validation returning preview rows, validation diagnostics, and transformation summary without mutating SQLite. |
+| `POST` | `/api/etl/ingest` | Executes the full 6-stage ETL pipeline and commits valid inserts/upserts and run logs to SQLite. |
+| `POST` | `/api/ai/executive-report` | Generates evidence-cited management reports across 6 AI operation modes. |
+| `POST` | `/api/ai/chat` | Interactive PwC AI Copilot grounded strictly in validated SQLite project, task, milestone, and risk records. |
+
+---
+
+## 5. KPI & Transformation Formula Definitions
+
+| KPI / Metric | Mathematical & SQL Transformation Formula | Source Tables |
+|---|---|---|
+| **Portfolio Completion (%)** | `ROUND(AVG(projects.progress), 1)` | `projects` |
+| **Task Completion Rate (%)** | `ROUND((COUNT(CASE WHEN status = 'Completed' THEN 1 END) * 100.0) / COUNT(*), 1)` | `tasks` |
+| **Overdue Tasks** | `COUNT(*) WHERE status != 'Completed' AND due_date < :referenceDate` | `tasks` |
+| **Overdue Milestones** | `COUNT(*) WHERE status != 'Completed' AND completion_percent < 100 AND planned_date < :referenceDate` | `milestones` |
+| **Budget Variance ($)** | `SUM(actual_spend) - SUM(allocated_budget)` (positive = budget overrun) | `projects` |
+| **Budget Utilization (%)** | `ROUND((SUM(actual_spend) / SUM(allocated_budget)) * 100, 1)` | `projects` |
+| **Resource Utilization (%)** | `ROUND((SUM(active_task_weekly_hours) / team_members.weekly_capacity_hours) * 100, 1)` | `tasks`, `team_members` |
+| **Risk Score (1–25)** | `probability (1..5) * impact (1..5)` (`>=16` Critical, `10..15` High, `5..9` Medium, `1..4` Low) | `risks` |
+| **Project Health (RAG)** | `Red` if `status='Delayed'` or `util>105%` or `overdue_ms>=2` or `crit_risk>=1`; `Amber` if `status='At Risk'` or `util>98%` or `overdue_ms=1`; else `Green` | `projects`, `milestones`, `risks`, `tasks` |
+
+---
+
+## 6. Setup & Testing Instructions
+
+```bash
+# 1. Start the full-stack Express + SQLite + Vite development server on port 3000
+npm run dev
+
+# 2. Run the 11-Suite Automated QA, Data Engineering & Relational Integrity Verification Suite
+npm test
+
+# 3. Run TypeScript static type validation
+npm run lint
+
+# 4. Build production bundle
+npm run build
+```

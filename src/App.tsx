@@ -14,12 +14,16 @@ import {
   CalendarCheck2,
   ChevronLeft,
   ChevronRight,
+  Database,
   DollarSign,
   FileSpreadsheet,
   FolderKanban,
   GanttChart,
   Layers,
   ListTodo,
+  Menu,
+  Pin,
+  PinOff,
   Play,
   Search,
   Settings,
@@ -34,6 +38,7 @@ import { ActivityLogView } from './components/ActivityLogView';
 import { AIChatbotWidget } from './components/AIChatbotWidget';
 import { AIExecutiveAssistantView } from './components/AIExecutiveAssistantView';
 import { BudgetMonitoringView } from './components/BudgetMonitoringView';
+import { DataEngineeringView } from './components/DataEngineeringView';
 import { ExecutiveDashboard } from './components/ExecutiveDashboard';
 import { GUIDED_DEMO_STEPS, GuidedDemoBar } from './components/GuidedDemoBar';
 import { IssuesDependenciesView } from './components/IssuesDependenciesView';
@@ -53,6 +58,7 @@ import {
   ActiveModuleId,
   ActivityLogEntry,
   Department,
+  ETLPipelineRun,
   ExecutiveReport,
   HealthStatus,
   IssueItem,
@@ -112,7 +118,8 @@ export default function App() {
     useState<string>('prj-102');
   const [inspectedProjectId, setInspectedProjectId] = useState<string | null>(null);
   const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isDrawerPinned, setIsDrawerPinned] = useState<boolean>(false);
 
   // RBAC User Role & Active Persona State
   const [currentUserRole, setCurrentUserRole] = useState<UserAppRole>('Administrator');
@@ -1063,6 +1070,13 @@ export default function App() {
         groupLabel: 'INTELLIGENCE',
         items: [
           {
+            id: 'data-pipeline',
+            label: 'Data Pipeline & ETL',
+            icon: Database,
+            badge: `${(state.etlRuns || []).length || 2} Runs`,
+            badgeTone: 'neutral',
+          },
+          {
             id: 'ai-assistant',
             label: 'AI Project Assistant',
             icon: Sparkles,
@@ -1095,20 +1109,22 @@ export default function App() {
           },
           {
             id: 'settings',
-            label: 'Settings',
+            label: 'Executive Profile & Settings',
             icon: Settings,
+            badge: 'Sopan',
+            badgeTone: 'neutral',
           },
           {
             id: 'qa-video',
             label: 'QA & Video Suite',
             icon: ShieldCheck,
-            badge: '8/8',
+            badge: '11/11',
             badgeTone: 'neutral',
           },
         ],
       },
     ],
-    [kpis, state.reports.length, state.teamMembers]
+    [kpis, state.etlRuns, state.reports.length, state.teamMembers]
   );
 
   // Active Breadcrumb computation
@@ -1126,8 +1142,18 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-[#0F172A]">
       {/* Global Enterprise Top Navigation Bar */}
       <header className="no-print sticky top-0 z-30 bg-white border-b border-slate-200 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
-        {/* Left: Brand Wordmark + Breadcrumb */}
+        {/* Left: 3-Line Slide-In Menu Trigger + Brand Wordmark + Breadcrumb */}
         <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen((prev) => !prev)}
+            aria-label="Open Navigation Menu"
+            title="Click to slide in navigation menu and explore all modules"
+            className="inline-flex items-center justify-center w-9 h-9 rounded border border-slate-200 bg-slate-50 hover:bg-slate-900 hover:text-white hover:border-slate-900 text-slate-800 transition-colors cursor-pointer shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
           <a
             href="#dashboard"
             onClick={(e) => {
@@ -1143,7 +1169,12 @@ export default function App() {
           </a>
 
           <span className="hidden md:inline text-slate-300">/</span>
-          <div className="hidden md:flex items-center gap-1.5 text-xs truncate">
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            title="Click to switch module"
+            className="hidden md:flex items-center gap-1.5 text-xs truncate px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+          >
             <span className="font-mono uppercase text-[10px] tracking-wider text-slate-400">
               {activeBreadcrumb.group}
             </span>
@@ -1151,7 +1182,7 @@ export default function App() {
             <span className="font-semibold text-slate-800 truncate">
               {activeBreadcrumb.page}
             </span>
-          </div>
+          </button>
         </div>
 
         {/* Center: Global Search Input Across Projects, Tasks, Milestones, Team & Risks */}
@@ -1366,10 +1397,14 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveModule('settings')}
-            title="View & Edit Profile Settings"
-            className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Open Sopan Shinde Executive Partner Dossier & Governance Settings"
+            className={`hidden sm:inline-flex items-center gap-2.5 px-3 py-1.5 rounded-md border transition-all cursor-pointer ${
+              activeModule === 'settings'
+                ? 'border-[#D04A02] bg-orange-50/60 text-slate-900 shadow-xs ring-1 ring-[#D04A02]/30'
+                : 'border-slate-200/95 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-900 shadow-2xs'
+            }`}
           >
-            <span className="w-6 h-6 rounded-full bg-[#0F172A] text-white font-mono text-[10px] font-bold flex items-center justify-center">
+            <span className="w-6 h-6 rounded bg-[#0F172A] text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0 border border-slate-700">
               {currentUserName
                 .split(' ')
                 .map((n) => n[0])
@@ -1379,7 +1414,9 @@ export default function App() {
             </span>
             <div className="text-left leading-tight">
               <div className="text-xs font-bold text-slate-900">{currentUserName}</div>
-              <div className="text-[10px] font-mono text-slate-500">{currentUserRole}</div>
+              <div className="text-[10px] font-mono text-[#D04A02] font-semibold">
+                {currentUserRole} · PWC-IN-88412
+              </div>
             </div>
           </button>
 
@@ -1389,7 +1426,7 @@ export default function App() {
               type="button"
               onClick={() => setIsNotifOpen((prev) => !prev)}
               aria-label="Open Notification Centre"
-              className="relative p-2 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
+              className="relative p-2 rounded-md border border-slate-200/95 bg-white hover:bg-slate-50 shadow-2xs text-slate-700 cursor-pointer"
             >
               <Bell className="w-4 h-4" />
               {kpis.notifications.length > 0 && (
@@ -1400,7 +1437,7 @@ export default function App() {
             </button>
 
             {isNotifOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded shadow-xl p-4 z-50 space-y-3 text-xs">
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 fin-card p-4 z-50 space-y-3 text-xs">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <div>
                     <div className="font-bold text-slate-900">
@@ -1459,7 +1496,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleStartGuidedDemo}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#D04A02] hover:bg-[#b53f02] rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#D04A02] hover:bg-[#b53f02] rounded-md shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Start Guided Demo</span>
@@ -1485,138 +1522,271 @@ export default function App() {
         onResetData={handleResetDemoData}
       />
 
-      {/* Main Application Shell: Expandable/Collapsible 5-Group Sidebar + Primary Viewport */}
-      <div className="flex-1 flex flex-col lg:flex-row max-w-[1680px] w-full mx-auto">
-        <aside
-          className={`no-print shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col justify-between transition-all ${
-            isSidebarCollapsed ? 'w-full lg:w-[68px] p-2' : 'w-full lg:w-[256px] p-3.5'
-          }`}
-        >
-          <div className="space-y-4">
-            {/* Collapse Toggle & Active Persona Indicator */}
-            <div className="hidden lg:flex items-center justify-between px-2 pt-1">
-              {!isSidebarCollapsed && (
-                <div className="truncate">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                    Active Persona
-                  </div>
-                  <div className="text-xs font-bold text-slate-900 truncate">
-                    {currentUserName}
-                  </div>
+      {/* Slide-In Left Navigation Drawer Backdrop (when not pinned) */}
+      {isDrawerOpen && !isDrawerPinned && (
+        <div
+          onClick={() => setIsDrawerOpen(false)}
+          className="no-print fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-[1px] transition-opacity duration-300"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Slide-In Left Navigation Drawer (Opens from Left on 3-Lines Click) */}
+      <aside
+        aria-label="Slide-In Module Explorer"
+        className={`no-print fixed top-0 left-0 bottom-0 z-50 w-[316px] bg-white border-r border-slate-200/95 shadow-[0_12px_36px_-4px_rgba(15,23,42,0.22)] flex flex-col justify-between transition-transform duration-300 ease-in-out ${
+          isDrawerOpen || isDrawerPinned ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Top Drawer Header: Brand + Institutional Sopan Shinde Partner Card + Pin/Close */}
+        <div className="p-4 border-b border-slate-200/95 bg-slate-50/85 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-md bg-[#D04A02] text-white font-mono text-xs font-bold flex items-center justify-center shadow-2xs">
+                P
+              </span>
+              <div>
+                <div className="text-sm font-extrabold tracking-tight text-slate-900 leading-none">
+                  ProjectPulse AI
                 </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-                className="p-1.5 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer ml-auto"
-              >
-                {isSidebarCollapsed ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <ChevronLeft className="w-4 h-4" />
-                )}
-              </button>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mt-0.5">
+                  PwC India PMO Suite
+                </div>
+              </div>
             </div>
-
-            {/* 5-Group Navigation */}
-            <div className="flex lg:flex-col gap-3 overflow-x-auto pb-2 lg:pb-0">
-              {sidebarGroups.map((group) => (
-                <div key={group.groupLabel} className="space-y-1 shrink-0">
-                  {!isSidebarCollapsed && (
-                    <div className="hidden lg:block px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
-                      {group.groupLabel}
-                    </div>
-                  )}
-                  <div className="flex lg:flex-col gap-0.5">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const isSelected = activeModule === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setActiveModule(item.id)}
-                          title={item.label}
-                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                            isSelected
-                              ? 'bg-[#0F172A] text-white font-semibold'
-                              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Icon className="w-4 h-4 shrink-0" />
-                            {!isSidebarCollapsed && (
-                              <span className="truncate">{item.label}</span>
-                            )}
-                          </div>
-                          {!isSidebarCollapsed && item.badge && (
-                            <span
-                              className={`font-mono text-[10px] px-1.5 py-0.2 rounded ${
-                                isSelected
-                                  ? 'bg-slate-800 text-[#FDBA74]'
-                                  : item.badgeTone === 'danger'
-                                  ? 'bg-red-50 text-red-700 font-bold'
-                                  : item.badgeTone === 'warning'
-                                  ? 'bg-amber-50 text-amber-800 font-bold'
-                                  : 'text-slate-500'
-                              }`}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {/* Floating Copilot Trigger */}
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setIsChatbotOpen((prev) => !prev)}
-                className="w-full mt-1 flex items-center justify-between gap-2 px-2.5 py-2 rounded text-xs font-semibold bg-orange-50 hover:bg-orange-100 text-[#D04A02] border border-orange-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                onClick={() => {
+                  setIsDrawerPinned((prev) => !prev);
+                  if (!isDrawerPinned) setIsDrawerOpen(true);
+                }}
+                title={isDrawerPinned ? 'Unpin Drawer (Slide-Over Mode)' : 'Pin Drawer Open'}
+                className={`p-1.5 rounded-md border text-xs transition-colors cursor-pointer ${
+                  isDrawerPinned
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                    : 'bg-white text-slate-600 border-slate-200/95 hover:bg-slate-100'
+                }`}
               >
-                <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 shrink-0" />
-                  {!isSidebarCollapsed && <span>PwC AI Copilot</span>}
-                </div>
-                {!isSidebarCollapsed && (
-                  <span className="font-mono text-[10px]">LIVE</span>
-                )}
+                {isDrawerPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDrawerOpen(false);
+                  setIsDrawerPinned(false);
+                }}
+                aria-label="Close Navigation Drawer"
+                className="p-1.5 rounded-md border border-slate-200/95 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Bottom Sidebar Data Governance Summary */}
-          {!isSidebarCollapsed && (
-            <div className="hidden lg:block pt-4 border-t border-slate-200 space-y-1.5 text-xs text-slate-600">
-              <div className="font-semibold text-slate-900">PwC India Telemetry</div>
-              <div className="space-y-1 font-mono text-[11px]">
-                <div className="flex justify-between">
-                  <span>Health (G/A/R):</span>
-                  <span className="text-slate-900 font-semibold">
-                    {kpis.healthDistribution.Green} / {kpis.healthDistribution.Amber} /{' '}
-                    {kpis.healthDistribution.Red}
-                  </span>
+          {/* Institutional Partner Card with Professional Summary inside Slide-In Menu */}
+          <div
+            onClick={() => {
+              setActiveModule('settings');
+              if (!isDrawerPinned) setIsDrawerOpen(false);
+            }}
+            className="fin-card-dark text-white p-3.5 cursor-pointer hover:border-slate-600 transition-all space-y-2.5"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-9 h-9 rounded-md bg-[#D04A02] text-white font-mono text-xs font-extrabold flex items-center justify-center shrink-0 border border-orange-300/30 shadow-xs">
+                  {currentUserName
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white truncate">
+                    {currentUserName}
+                  </div>
+                  <div className="text-[10px] font-mono text-[#FDBA74] truncate">
+                    {currentUserRole} · PWC-IN-88412
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Tasks Completed:</span>
-                  <span className="text-slate-900 font-semibold">
-                    {kpis.completedTasks}/{kpis.totalTasks}
-                  </span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-mono text-[9px] font-bold uppercase shrink-0">
+                Verified
+              </span>
+            </div>
+
+            {/* Sidebar Professional Summary Snippet */}
+            <div className="pt-2 border-t border-slate-800/90 space-y-1.5">
+              <div className="text-[9px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                Executive Professional Summary
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Partner, Cyber &amp; Cloud Transformation leading RBI/SEBI cyber resilience,
+                zero-trust cloud &amp; enterprise portfolio governance.
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] font-mono">
+                <div className="px-2 py-1 rounded bg-slate-900/80 border border-slate-800 text-slate-300">
+                  <span className="text-slate-500 block text-[9px]">MANAGED</span>
+                  <span className="text-white font-bold">$3.10M USD</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Overdue MS:</span>
-                  <span className="text-[#DC2626] font-semibold">
-                    {kpis.overdueMilestones}
-                  </span>
+                <div className="px-2 py-1 rounded bg-slate-900/80 border border-slate-800 text-slate-300">
+                  <span className="text-slate-500 block text-[9px]">SIGN-OFF</span>
+                  <span className="text-emerald-400 font-bold">$25.0M USD</span>
                 </div>
               </div>
             </div>
-          )}
-        </aside>
+
+            <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/90 text-[10px] font-mono text-slate-300">
+              <span>Mumbai (BKC) · Technology</span>
+              <span className="text-[#FDBA74] font-semibold underline">
+                Open Dossier →
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable 5-Group Module Explorer */}
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          {sidebarGroups.map((group) => (
+            <div key={group.groupLabel} className="space-y-1">
+              <div className="px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                {group.groupLabel}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = activeModule === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveModule(item.id);
+                        if (!isDrawerPinned) {
+                          setIsDrawerOpen(false);
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0F172A] text-white font-semibold border-l-2 border-[#D04A02] shadow-xs'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {item.badge && (
+                        <span
+                          className={`font-mono tabular-nums text-[10px] px-1.5 py-0.5 rounded border ${
+                            isSelected
+                              ? 'bg-slate-800 border-slate-700 text-[#FDBA74] font-bold'
+                              : item.badgeTone === 'danger'
+                              ? 'bg-red-50 border-red-200 text-red-700 font-bold'
+                              : item.badgeTone === 'warning'
+                              ? 'bg-amber-50 border-amber-200 text-amber-800 font-bold'
+                              : 'bg-slate-100 border-slate-200/80 text-slate-600'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Floating Copilot Trigger inside Drawer */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsChatbotOpen(true);
+              if (!isDrawerPinned) setIsDrawerOpen(false);
+            }}
+            className="w-full mt-2 flex items-center justify-between gap-2 px-3 py-2.5 rounded-md text-xs font-semibold bg-orange-50/90 hover:bg-orange-100 text-[#D04A02] border border-orange-200 shadow-2xs transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Bot className="w-4 h-4 shrink-0" />
+              <span>Ask PwC AI Copilot</span>
+            </div>
+            <span className="font-mono text-[10px] font-bold">LIVE</span>
+          </button>
+        </div>
+
+        {/* Bottom Drawer Data Governance Summary */}
+        <div className="p-3.5 border-t border-slate-200/95 bg-slate-50/90 space-y-1.5 text-xs text-slate-600">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-slate-900">Portfolio Telemetry</span>
+            <span className="font-mono text-[10px] text-emerald-700 font-bold">
+              SQLite WAL · 100% Quality
+            </span>
+          </div>
+          <div className="space-y-1 font-mono tabular-nums text-[11px]">
+            <div className="flex justify-between">
+              <span>Health (G/A/R):</span>
+              <span className="text-slate-900 font-semibold">
+                {kpis.healthDistribution.Green} / {kpis.healthDistribution.Amber} /{' '}
+                {kpis.healthDistribution.Red}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Tasks Completed:</span>
+              <span className="text-slate-900 font-semibold">
+                {kpis.completedTasks}/{kpis.totalTasks} ({kpis.taskCompletionRate}%)
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Overdue Milestones:</span>
+              <span className="text-[#DC2626] font-semibold">
+                {kpis.overdueMilestones}
+              </span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Application Shell */}
+      <div
+        className={`flex-1 flex flex-col max-w-[1680px] w-full mx-auto transition-all duration-300 ${
+          isDrawerPinned ? 'lg:pl-[316px]' : ''
+        }`}
+      >
+        {/* Quick Explore Bar for Instant Tab Switching or Opening the 3-Line Drawer */}
+        <div className="no-print bg-white border-b border-slate-200 px-4 lg:px-6 py-2 flex items-center gap-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 shrink-0 cursor-pointer"
+          >
+            <Menu className="w-3.5 h-3.5 text-[#FDBA74]" />
+            <span>All 16 Modules</span>
+          </button>
+          <span className="text-slate-300">|</span>
+          {sidebarGroups
+            .flatMap((g) => g.items)
+            .map((item) => {
+              const Icon = item.icon;
+              const active = activeModule === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveModule(item.id)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors shrink-0 cursor-pointer ${
+                    active
+                      ? 'bg-orange-50 text-[#D04A02] border border-orange-200 font-semibold'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+        </div>
 
         {/* Primary Module Viewport */}
         <main className="flex-1 p-4 lg:p-6 overflow-x-hidden pb-24">
@@ -1775,6 +1945,30 @@ export default function App() {
               state={state}
               kpis={kpis}
               onSaveReport={handleSaveReport}
+            />
+          )}
+
+          {activeModule === 'data-pipeline' && (
+            <DataEngineeringView
+              state={state}
+              kpis={kpis}
+              currentUserName={currentUserName}
+              onExecuteETLPipeline={(nextState: PortfolioState, run: ETLPipelineRun) => {
+                const ok = commitPortfolioState(
+                  () => nextState,
+                  {
+                    action: 'Updated',
+                    entityType: 'Project',
+                    entityCode: run.runCode,
+                    description: `Executed ETL pipeline "${run.batchName}": ${run.insertedRecords} inserted, ${run.updatedRecords} upserted, ${run.rejectedRecords} quarantined (Quality ${run.qualityScore}%).`,
+                  }
+                );
+                if (ok) {
+                  showToast(
+                    `ETL Run ${run.runCode} committed to SQLite (${run.insertedRecords} inserted, ${run.updatedRecords} upserted, ${run.rejectedRecords} quarantined).`
+                  );
+                }
+              }}
             />
           )}
 

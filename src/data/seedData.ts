@@ -12,6 +12,7 @@ import {
   TeamMember,
 } from '../types/portfolio';
 import { buildEvidenceReportFromState, calculateRiskScore } from '../utils/calculations';
+import { SEED_ETL_RUNS } from '../utils/dataEngineering';
 
 export const DEFAULT_REFERENCE_DATE = '2026-11-02';
 
@@ -1787,6 +1788,7 @@ export function createInitialSeedState(): PortfolioState {
     dependencies: structuredClone(SEED_DEPENDENCIES),
     teamMembers: structuredClone(SEED_TEAM_MEMBERS),
     activityLog: structuredClone(SEED_ACTIVITY_LOG),
+    etlRuns: structuredClone(SEED_ETL_RUNS),
     reports: [],
     referenceDate: DEFAULT_REFERENCE_DATE,
     storageMode: 'sqlite-server',

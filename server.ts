@@ -18,6 +18,10 @@ import {
 import {
   ActivityLogEntry,
   AIOperationType,
+  ETLEntityTarget,
+  ETLImportMode,
+  ETLPipelineRun,
+  ETLSourceFormat,
   ExecutiveReport,
   IssueItem,
   Milestone,
@@ -39,6 +43,11 @@ import {
   isMilestoneOverdue,
   isTaskOverdue,
 } from './src/utils/calculations';
+import {
+  computeDataQualityAudit,
+  runDataIngestionPipeline,
+  SEED_ETL_RUNS,
+} from './src/utils/dataEngineering';
 
 dotenv.config();
 
@@ -89,6 +98,7 @@ function saveStateToSqlite(state: PortfolioState) {
     db.prepare('DELETE FROM dependencies').run();
     db.prepare('DELETE FROM team_members').run();
     db.prepare('DELETE FROM activity_log').run();
+    db.prepare('DELETE FROM etl_pipeline_runs').run();
     db.prepare('DELETE FROM projects').run();
     db.prepare('DELETE FROM executive_reports').run();
 
@@ -345,6 +355,42 @@ function saveStateToSqlite(state: PortfolioState) {
         rep.isAiGenerated ? 1 : 0
       );
     }
+
+    const insertEtl = db.prepare(`
+      INSERT INTO etl_pipeline_runs (
+        id, run_code, batch_name, source_format, entity_target, import_mode,
+        started_at, completed_at, duration_ms, status, total_records,
+        valid_records, inserted_records, updated_records, duplicate_records,
+        rejected_records, quality_score, triggered_by,
+        validation_issues_json, transformation_summary_json, execution_logs_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const run of s.etlRuns || SEED_ETL_RUNS) {
+      insertEtl.run(
+        run.id,
+        run.runCode,
+        run.batchName,
+        run.sourceFormat,
+        run.entityTarget,
+        run.importMode,
+        run.startedAt,
+        run.completedAt,
+        run.durationMs,
+        run.status,
+        run.totalRecords,
+        run.validRecords,
+        run.insertedRecords,
+        run.updatedRecords,
+        run.duplicateRecords,
+        run.rejectedRecords,
+        run.qualityScore,
+        run.triggeredBy,
+        JSON.stringify(run.validationIssues || []),
+        JSON.stringify(run.transformationSummary || []),
+        JSON.stringify(run.executionLogs || [])
+      );
+    }
   });
 
   tx(state);
@@ -551,6 +597,34 @@ function loadStateFromSqlite(): PortfolioState {
     isAiGenerated: Boolean(r.is_ai_generated),
   }));
 
+  const etlRows = db.prepare('SELECT * FROM etl_pipeline_runs ORDER BY started_at DESC').all() as Record<string, unknown>[];
+  const etlRuns: ETLPipelineRun[] =
+    etlRows.length > 0
+      ? etlRows.map((r) => ({
+          id: String(r.id),
+          runCode: String(r.run_code),
+          batchName: String(r.batch_name),
+          sourceFormat: r.source_format as ETLSourceFormat,
+          entityTarget: r.entity_target as ETLEntityTarget,
+          importMode: (r.import_mode as ETLImportMode) || 'upsert',
+          startedAt: String(r.started_at),
+          completedAt: String(r.completed_at),
+          durationMs: Number(r.duration_ms || 42),
+          status: r.status as ETLPipelineRun['status'],
+          totalRecords: Number(r.total_records),
+          validRecords: Number(r.valid_records),
+          insertedRecords: Number(r.inserted_records),
+          updatedRecords: Number(r.updated_records),
+          duplicateRecords: Number(r.duplicate_records),
+          rejectedRecords: Number(r.rejected_records),
+          qualityScore: Number(r.quality_score),
+          triggeredBy: String(r.triggered_by),
+          validationIssues: JSON.parse(String(r.validation_issues_json || '[]')),
+          transformationSummary: JSON.parse(String(r.transformation_summary_json || '[]')),
+          executionLogs: JSON.parse(String(r.execution_logs_json || '[]')),
+        }))
+      : structuredClone(SEED_ETL_RUNS);
+
   return {
     projects,
     milestones,
@@ -561,6 +635,7 @@ function loadStateFromSqlite(): PortfolioState {
     dependencies,
     teamMembers,
     activityLog,
+    etlRuns,
     reports,
     referenceDate: DEFAULT_REFERENCE_DATE,
     storageMode: 'sqlite-server',
@@ -729,6 +804,185 @@ async function startServer() {
     } catch (error) {
       console.error('Error resetting demo dataset:', error);
       res.status(500).json({ error: 'Failed to reset synthetic demonstration data.' });
+    }
+  });
+
+  // 3A. GET /api/projects — Relational project retrieval with computed KPIs & optional filters
+  app.get('/api/projects', (req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      const kpis = computeDashboardKPIs(state);
+      const { department, status } = req.query;
+      const filtered = state.projects
+        .filter((p) => {
+          if (department && department !== 'All' && p.department !== department) return false;
+          if (status && status !== 'All' && p.status !== status) return false;
+          return true;
+        })
+        .map((p) => ({
+          ...p,
+          computedMetrics: kpis.projectMetricsMap[p.id],
+        }));
+
+      res.json({
+        count: filtered.length,
+        referenceDate: state.referenceDate,
+        projects: filtered,
+      });
+    } catch (error) {
+      console.error('Error in GET /api/projects:', error);
+      res.status(500).json({ error: 'Failed to retrieve relational project records.' });
+    }
+  });
+
+  // 3B. GET /api/tasks — Relational task retrieval with joined project context & overdue calculation
+  app.get('/api/tasks', (req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      const projMap = new Map(state.projects.map((p) => [p.id, p]));
+      const { projectId, status } = req.query;
+      const tasks = (state.tasks || [])
+        .filter((t) => {
+          if (projectId && t.projectId !== projectId) return false;
+          if (status && status !== 'All' && t.status !== status) return false;
+          return true;
+        })
+        .map((t) => {
+          const p = projMap.get(t.projectId);
+          return {
+            ...t,
+            projectCode: p?.code || 'UNMAPPED',
+            projectName: p?.name || 'Unmapped Project',
+            isOverdue: isTaskOverdue(t, state.referenceDate),
+          };
+        });
+
+      res.json({
+        count: tasks.length,
+        referenceDate: state.referenceDate,
+        tasks,
+      });
+    } catch (error) {
+      console.error('Error in GET /api/tasks:', error);
+      res.status(500).json({ error: 'Failed to retrieve relational task records.' });
+    }
+  });
+
+  // 3C. GET /api/analytics/kpis — Live calculated KPIs, Data Quality Audit & Relational FK Integrity
+  app.get('/api/analytics/kpis', (_req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      const kpis = computeDashboardKPIs(state);
+      const dataQuality = computeDataQualityAudit(state, kpis);
+      res.json({
+        referenceDate: state.referenceDate,
+        storageEngine: 'SQLite 3 (WAL + Foreign Key Integrity)',
+        kpis,
+        dataQuality,
+      });
+    } catch (error) {
+      console.error('Error in GET /api/analytics/kpis:', error);
+      res.status(500).json({ error: 'Failed to compute analytics KPIs and data quality metrics.' });
+    }
+  });
+
+  // 3D. GET /api/etl/history — Retrieve all ETL pipeline execution runs
+  app.get('/api/etl/history', (_req, res) => {
+    try {
+      const state = loadStateFromSqlite();
+      res.json({
+        count: (state.etlRuns || []).length,
+        runs: state.etlRuns || [],
+      });
+    } catch (error) {
+      console.error('Error in GET /api/etl/history:', error);
+      res.status(500).json({ error: 'Failed to retrieve ETL pipeline history.' });
+    }
+  });
+
+  // 3E. POST /api/etl/validate — Dry-run schema, required-field, duplicate & FK validation preview
+  app.post('/api/etl/validate', (req, res) => {
+    try {
+      const {
+        rawPayload = '',
+        batchName = 'Dry-Run Validation Batch',
+        sourceFormat = 'CSV',
+        entityTarget = 'Projects',
+        importMode = 'upsert',
+        triggeredBy = 'Sopan Shinde',
+      } = req.body || {};
+
+      const currentState = loadStateFromSqlite();
+      const result = runDataIngestionPipeline(
+        String(rawPayload),
+        {
+          batchName,
+          sourceFormat,
+          entityTarget,
+          importMode,
+          triggeredBy,
+          dryRunOnly: true,
+        },
+        currentState
+      );
+
+      res.json({
+        run: result.run,
+        previewRecords: result.previewRecords,
+      });
+    } catch (error) {
+      console.error('Error in POST /api/etl/validate:', error);
+      res.status(500).json({ error: 'Failed to validate incoming dataset.' });
+    }
+  });
+
+  // 3F. POST /api/etl/ingest — Full 6-stage ETL execution & atomic SQLite commit
+  app.post('/api/etl/ingest', (req, res) => {
+    try {
+      const userRole = String(req.headers['x-user-role'] || 'Administrator');
+      if (userRole === 'Executive / Viewer') {
+        res.status(403).json({
+          error: 'RBAC Permission Denied: Executive / Viewer role cannot execute ETL database writes.',
+        });
+        return;
+      }
+
+      const {
+        rawPayload = '',
+        batchName = 'Manual ETL Data Ingestion Batch',
+        sourceFormat = 'CSV',
+        entityTarget = 'Projects',
+        importMode = 'upsert',
+        triggeredBy = 'Sopan Shinde',
+      } = req.body || {};
+
+      const currentState = loadStateFromSqlite();
+      const result = runDataIngestionPipeline(
+        String(rawPayload),
+        {
+          batchName,
+          sourceFormat,
+          entityTarget,
+          importMode,
+          triggeredBy,
+          dryRunOnly: false,
+        },
+        currentState
+      );
+
+      saveStateToSqlite(result.nextState);
+      const updatedKpis = computeDashboardKPIs(result.nextState);
+      const updatedQuality = computeDataQualityAudit(result.nextState, updatedKpis);
+
+      res.json({
+        run: result.run,
+        state: result.nextState,
+        kpis: updatedKpis,
+        dataQuality: updatedQuality,
+      });
+    } catch (error) {
+      console.error('Error in POST /api/etl/ingest:', error);
+      res.status(500).json({ error: 'Failed to execute ETL ingestion pipeline.' });
     }
   });
 

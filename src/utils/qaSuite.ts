@@ -10,6 +10,11 @@ import {
   isMilestoneOverdue,
 } from './calculations';
 import { generateProjectsCSV, parseProjectsFromCSV } from './csvExport';
+import {
+  computeDataQualityAudit,
+  runDataIngestionPipeline,
+  SAMPLE_JSON_STRESS_BATCH,
+} from './dataEngineering';
 
 export interface QACheckResult {
   id: string;
@@ -293,6 +298,68 @@ export function runAllQAVerificationSuites(activeState?: PortfolioState): QAChec
     });
   }
 
+  // 10. Data Ingestion, Validation, Duplicate Detection & Quarantine Pipeline
+  {
+    const etlRes = runDataIngestionPipeline(
+      SAMPLE_JSON_STRESS_BATCH,
+      {
+        batchName: 'QA Automated ETL Stress Test',
+        sourceFormat: 'JSON',
+        entityTarget: 'Combined Batch',
+        importMode: 'upsert',
+        triggeredBy: 'Sopan Shinde',
+        dryRunOnly: false,
+      },
+      seed
+    );
+
+    const run = etlRes.run;
+    const passed =
+      run.totalRecords === 5 &&
+      run.validRecords === 3 &&
+      run.insertedRecords === 2 &&
+      run.updatedRecords === 1 &&
+      run.duplicateRecords === 1 &&
+      run.rejectedRecords === 2 &&
+      run.validationIssues.some((v) => v.rule === 'FOREIGN_KEY_ORPHAN') &&
+      run.validationIssues.some((v) => v.rule === 'REQUIRED_FIELD');
+
+    results.push({
+      id: 'qa-10',
+      suite: '10. Data Ingestion & ETL Validation',
+      title: 'CSV/JSON Parsing, Duplicate Upsert & Invalid/Orphan Quarantine',
+      passed,
+      expected:
+        '5 parsed -> 3 valid (2 inserted, 1 duplicate upserted) -> 2 rejected (REQUIRED_FIELD + FOREIGN_KEY_ORPHAN)',
+      actual: `${run.totalRecords} parsed -> ${run.validRecords} valid (${run.insertedRecords} ins, ${run.updatedRecords} ups) -> ${run.rejectedRecords} rejected`,
+      evidenceNote:
+        'Verified 6-stage ETL pipeline quarantines invalid schema rows and unmapped foreign keys while upserting valid updates.',
+    });
+  }
+
+  // 11. Relational Database Integrity & 5-Dimension Data Quality Audit
+  {
+    const audit = computeDataQualityAudit(targetState);
+    const zeroOrphans = audit.relationalChecks.every((c) => c.orphanedRows === 0);
+    const passed =
+      audit.overallScore >= 99 &&
+      zeroOrphans &&
+      audit.relationalChecks.length === 7 &&
+      audit.kpiFormulaRegistry.length === 9;
+
+    results.push({
+      id: 'qa-11',
+      suite: '11. Relational FK & Data Quality Audit',
+      title: 'Zero-Orphan Foreign Key Enforcement & 5-Dimension Quality Index',
+      passed,
+      expected: 'Quality Score >= 99%, 0 Orphaned FKs across 7 relationships, 9 KPI formulas verified',
+      actual: `Quality=${audit.overallScore}%, ZeroOrphans=${zeroOrphans} (${audit.relationalChecks.length} FKs), Formulas=${audit.kpiFormulaRegistry.length}`,
+      evidenceNote:
+        'Verified referential integrity across projects, milestones, milestone_history, tasks, risks, issues, dependencies, and team_members.',
+    });
+  }
+
   return results;
 }
+
 
